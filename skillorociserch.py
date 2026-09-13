@@ -79,8 +79,8 @@ def query_profiles_from_oracle(search_keywords=None):
 # ----------------------------------------------------
 # 2. RUNTIME UI & STYLING LOGIC
 # ----------------------------------------------------
-st.set_page_config(page_title="Oracle Cloud BLOB Portal", page_icon="☁️", layout="wide")
-st.title("☁️ Live Oracle Cloud 23ai BLOB Matcher Engine")
+st.set_page_config(page_title="Oracle Cloud Portal", page_icon="☁️", layout="wide")
+st.title("☁️ Profile Matcher Portal")
 st.write("Select expertise checklist flags below. Checkboxes are **dynamically populated** from live OCI cloud database rows.")
 
 st.markdown("""
