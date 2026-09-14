@@ -2,21 +2,21 @@ import streamlit as st
 import pandas as pd
 import oracledb
 import os
+from collections import Counter
 
 # ----------------------------------------------------
 # 1. ORACLE CLOUD ENGINE CONFIGURATION (THIN MODE)
 # ----------------------------------------------------
-# On Streamlit Cloud, the wallet folder will sit right next to the script
 WALLET_DIR = os.path.join(os.getcwd(), "wallet_files")
 
 def get_db_connection():
     connection_params = {
         "user": "ADMIN",
-        "password": st.secrets["db_password"],      # 🔒 Secured via Streamlit Vault
+        "password": st.secrets["db_password"],      # 🔒 Secured via hidden vault configuration
         "dsn": "search_low",                       
         "config_dir": WALLET_DIR,                  
         "wallet_location": WALLET_DIR,             
-        "wallet_password": st.secrets["wallet_password"],  # 🔒 Secured via Streamlit Vault
+        "wallet_password": st.secrets["wallet_password"],  # 🔒 Secure wallet password
         "ssl_server_dn_match": False               
     }
     
@@ -28,8 +28,8 @@ def get_db_connection():
     conn.outputtypehandler = blob_to_bytes_handler
     return conn
 
-# Pulls unique expertise items dynamically from live cloud database rows
-def get_unique_skills_from_oracle():
+# Pulls skills matrices from OCI and tallies volume counts dynamically
+def get_unique_skills_with_counts():
     try:
         conn = get_db_connection()
         query = "SELECT skills_matrix FROM skills"
@@ -37,22 +37,29 @@ def get_unique_skills_from_oracle():
         conn.close()
         
         if df.empty:
-            return ["Oracle DBA", "OCI", "Oracle Designer", "Python Basics", "Streamlit"]
+            return {}, []
             
         target_column = 'SKILLS_MATRIX' if 'SKILLS_MATRIX' in df.columns else 'skills_matrix'
         
-        skills_series = df[target_column].astype(str).dropna()
-        skills_lists = skills_series.str.split(',')
-        exploded_skills = skills_lists.explode()
-        cleaned_skills = exploded_skills.str.strip()
+        # Isolate and split comma strings into a single consolidated flat python list
+        all_skills_list = []
+        for raw_matrix in df[target_column].astype(str).dropna():
+            if raw_matrix.strip():
+                # Split comma rows, strip out surrounding whitespace characters, and preserve spelling casing
+                items = [item.strip() for item in raw_matrix.split(",") if item.strip()]
+                all_skills_list.extend(items)
         
-        unique_series = cleaned_skills.drop_duplicates()
-        unique_series = unique_series[unique_series != '']
-        unique_series = unique_series[unique_series.str.lower() != 'error']
+        # Calculate raw frequency volumes using high-performance counter dictionaries
+        tally_dict = Counter(all_skills_list)
         
-        return sorted(unique_series.tolist())
+        # Extract individual unique string keys and sort them alphabetically
+        sorted_unique_names = sorted(tally_dict.keys())
+        return tally_dict, sorted_unique_names
     except Exception as e:
-        return ["Oracle DBA", "OCI", "Oracle Designer", "Python Basics", "Streamlit", "AWS", "Cloud Security", "Linux", "PL/SQL", "Git"]
+        # Graceful fallback array array structure to handle connection blocks safely
+        fallback_list = ["Oracle DBA", "OCI", "Oracle Designer", "Python Basics", "Streamlit"]
+        fallback_counts = {k: 1 for k in fallback_list}
+        return fallback_counts, fallback_list
 
 def query_profiles_from_oracle(search_keywords=None):
     try:
@@ -79,9 +86,9 @@ def query_profiles_from_oracle(search_keywords=None):
 # ----------------------------------------------------
 # 2. RUNTIME UI & STYLING LOGIC
 # ----------------------------------------------------
-st.set_page_config(page_title="Oracle Cloud Portal", page_icon="☁️", layout="wide")
-st.title("☁️ Profile Matcher Portal")
-st.write("Select expertise checklist flags below. Checkboxes are **dynamically populated** from live OCI cloud database rows.")
+st.set_page_config(page_title="Oracle Cloud BLOB Portal", page_icon="☁️", layout="wide")
+st.title("☁️ Live Oracle Cloud 23ai BLOB Matcher Engine")
+st.write("Select expertise checklist flags below. Checkboxes display **real-time profile metrics** from OCI cloud table rows.")
 
 st.markdown("""
 <style>
@@ -123,12 +130,17 @@ with st.sidebar:
     st.write("Toggle filter flags to run live SQL parameter filters against your Always Free ATP instance.")
     st.write("**Dynamic Skills Matrix Filters:**")
     
-    available_skills = get_unique_skills_from_oracle()
+    # Extract calculated metrics data straight out of the live database
+    skills_tally, sorted_skills_keys = get_unique_skills_with_counts()
     
     selected_sidebar_skills = []
-    for skill in available_skills:
-        if st.checkbox(skill, key=f"cloud_cb_{skill.replace(' ', '_')}"):
-            selected_sidebar_skills.append(skill.lower())
+    for skill_name in sorted_skills_keys:
+        count_val = skills_tally.get(skill_name, 0)
+        # Formats text display to append numerical profile volumes dynamically on screen
+        checkbox_label = f"{skill_name} ({count_val})"
+        
+        if st.checkbox(checkbox_label, key=f"cloud_cb_{skill_name.replace(' ', '_')}"):
+            selected_sidebar_skills.append(skill_name.lower())
 
 # ----------------------------------------------------
 # 4. DATA MATCHING ENGINE INTEGRATION RUNS
@@ -182,4 +194,4 @@ if active_keywords:
     else:
         st.warning(f"No profile matches found inside cloud table 'skills' for criteria.")
 else:
-    st.info("👋 Good Evening! Check sidebar filters on the left matrix to query live rows directly from Oracle Cloud.")
+    st.info("👋 Good Morning! Check sidebar filters on the left matrix to query live rows directly from Oracle Cloud.")
