@@ -15,30 +15,14 @@ def get_db_connection():
     conn.outputtypehandler = bh
     return conn
 
+# ✅ HYPER-COMPACT ULTRA-CLEAN DICTIONARY DIRECTORY MATRIX
 def get_master_taxonomy():
     return {
-        "Delivery Manager": {
-            "☁️ Cloud Architecture": ["OCI", "AWS", "Azure", "Cloud Security"],
-            "📐 Solution Blueprinting": ["Database Modelling", "Oracle Designer"],
-            "🤖 Executive AI Automation": ["AI Skills"]
-        },
-        "🗄️ Database Administrator (DBA)": {
-            "💎 Core Oracle Engine": ["Oracle DBA", "PL/SQL", "SQL"],
-            "💾 Open-Source Data RDBMS": ["PostgreSQL"]
-        },
-        "💻 Application Developer": {
-            "🐍 Python Ecosystem": ["Python", "Flask", "Django", "Streamlit"],
-            "☕ Java Core Enterprise": ["Java"],
-            "🤖 Cognitive Core Frameworks": ["AI Skills"]
-        },
-        "🖥️ System Administrator": {
-            "💿 Unix & Open Server OS": ["Linux", "Unix"],
-            "⚙️ Legacy Server Environments": ["Websphere", "Dos", "Mac"]
-        },
-        "🛠️ ITIL & Infrastructure Engineer": {
-            "📦 DevOps Containerization": ["Docker", "Kubernetes", "Git"],
-            "🧱 Legacy Infrastructure Core": ["Cobol"]
-        }
+        "DM": {"☁️ Cloud": ["OCI", "AWS", "Azure"], "📐 Design": ["Modelling", "Designer"], "🤖 AI": ["AI Skills"]},
+        "DBA": {"💎 Oracle": ["Oracle DBA", "PL/SQL", "SQL"], "💾 Open": ["PostgreSQL"]},
+        "Dev": {"🐍 Python": ["Python", "Flask", "Django", "Streamlit"], "☕ Java": ["Java"], "🤖 AI": ["AI Skills"]},
+        "Sys": {"💿 Unix": ["Linux", "Unix"], "⚙️ Legacy": ["Websphere", "Dos", "Mac"]},
+        "Infra": {"📦 DevOps": ["Docker", "Kubernetes", "Git"], "🧱 Legacy": ["Cobol"]}
     }
 
 def get_categorized_skills_with_counts():
@@ -49,11 +33,7 @@ def get_categorized_skills_with_counts():
         if df.empty: return {}, {}, 0
         df.columns = [c.upper() for c in df.columns]
         all_s = []
-        n_map = {
-            "plsql": "PL/SQL", "pl/sql": "PL/SQL", "oracle dba": "Oracle DBA", "oci": "OCI",
-            "python basics": "Python", "python": "Python", "ai skills": "AI Skills", 
-            "ai": "AI Skills", "machine learning": "AI Skills"
-        }
+        n_map = {"plsql": "PL/SQL", "pl/sql": "PL/SQL", "oracle dba": "Oracle DBA", "oci": "OCI", "python basics": "Python", "python": "Python", "ai skills": "AI Skills", "ai": "AI Skills", "machine learning": "AI Skills"}
         for rm in df['SKILLS_MATRIX'].astype(str).dropna():
             sp = rm.split("Skills:")[-1] if "Skills:" in rm else rm
             for it in sp.split(","):
@@ -87,16 +67,6 @@ def build_zip_archive(candidates):
     buf.seek(0)
     return buf.getvalue()
 
-# ✅ LIGHTWEIGHT ROW RENDERER: Keeps codebase perfectly clean and modular
-def draw_packed_row(cand, r_cnt):
-    r1, r2, r3, r4, r5 = st.columns([1.0, 2.5, 1.5, 1.5, 4.5])
-    with r1: st.checkbox("", key=f"chk_row_{cand['ID']}_{r_cnt}")
-    with r2: st.markdown(f"👤 **{cand['NAME']}**")
-    with r3: st.write(f"{cand['EXP']} Yrs ({cand['TIER']})")
-    with r4: st.write(f"🎯 **{cand['WEIGHT']}**")
-    with r5: st.markdown(cand['SKILLS_DISP'])
-    st.markdown("<hr style='margin:2px 0; border-top:1px dashed #ccc;'>", unsafe_allow_html=True)
-
 st.set_page_config(page_title="Talent Search", layout="wide")
 st.title("☁️ Talent Search Workspace")
 st.write("Function-driven tabular workstation powered by Oracle Cloud Infrastructure.")
@@ -107,7 +77,7 @@ if "reset_counter" not in st.session_state: st.session_state.reset_counter = 0
 raw_tally, structured_tree, total_candidates = get_categorized_skills_with_counts()
 autocomplete_options = sorted(list(raw_tally.keys()))
 nlp_selection_tags = st.multiselect(
-    "Select technical competency keywords from the unified cloud index dropdown:",
+    "Select technical competency keywords from the index dropdown:",
     options=autocomplete_options, placeholder="Start typing or click to select skills...",
     key=f"main_search_index_{st.session_state.reset_counter}"
 )
@@ -122,7 +92,7 @@ with st.sidebar:
     st.markdown("<br>", unsafe_allow_html=True)
     s_tier = st.radio("Select Target Bracket:", options=["All Profiles (Ignore Exp Limit)", "< 3 Yrs (Entry Level)", "4-10 Yrs (Mid-Senior)", "> 10 Yrs (Principal)"])
     st.markdown("<hr>", unsafe_allow_html=True)
-    st.write("**💼 Dynamic Role-Based Multi-Select Dropdowns:**")
+    st.write("**💼 Role Multi-Select Dropdowns:**")
     for r_title, tech_dict in structured_tree.items():
         role_available_skills = []
         for t_title, s_list in tech_dict.items():
@@ -162,7 +132,7 @@ if len(active_keywords) > 0:
             hl_list = []
             for tag in disp_skills.split(","):
                 st_tag = tag.strip()
-                mf = any(kw in st_tag.lower() or (kw == "pl/sql" and "plsql" in st_tag.lower()) or (kw == "oci" and "oracle cloud infrastructure" in st_tag.lower()) or (kw == "python" and "python basics" in st_tag.lower()) or (kw == "ai skills" and "machine learning" in st_tag.lower()) for kw in active_keywords)
+                mf = any(kw in st_tag.lower() or (kw == "pl/sql" and "plsql" in st_tag.lower()) or (kw == "oci" and "oracle cloud infrastructure" in st_tag.lower()) or (kw == "python" and "python basics" in st_tag.lower()) or (kw == "ai skills" and "machine learning" in raw_str.lower()) for kw in active_keywords)
                 hl_list.append(f"**:red[{st_tag}]**" if mf else st_tag)
             matched_candidates.append({
                 "ID": str(row['ID']).strip(), "NAME": str(row['NAME']).strip(), "EXP": c_exp,
@@ -170,6 +140,18 @@ if len(active_keywords) > 0:
             })
         if matched_candidates:
             st.markdown(f"### 🎯 Matched Candidates ({len(matched_candidates)} Profiles Found)")
+            
+            # ✅ SCANNER BLOCK: Pulls active ticked selections out of session state cache dynamically
+            dl_list = [c for c in matched_candidates if st.session_state.get(f"chk_{c['ID']}_{st.session_state.reset_counter}", False)]
+            
+            # ✅ DIRECT FILE DOWNLOAD ENGINE LAYER: Displays flawlessly right above headers!
+            if dl_list:
+                zb_bytes = build_zip_archive(dl_list)
+                st.download_button(f"📥 Download Selected ZIP Archive ({len(dl_list)} Resumes)", zb_bytes, "Resumes.zip", "application/zip", use_container_width=True, type="primary")
+            else:
+                st.info("💡 Pro Tip: Tick the checkbox cell row next to any candidate below to instantly activate your bulk ZIP downloader tool!")
+                
+            st.markdown("<br>", unsafe_allow_html=True)
             h1, h2, h3, h4, h5 = st.columns([1.0, 2.5, 1.5, 1.5, 4.5])
             with h1: st.write("**Download**")
             with h2: st.write("**Candidate Name**")
@@ -178,12 +160,14 @@ if len(active_keywords) > 0:
             with h5: st.write("**Technologies Found**")
             st.markdown("<hr style='margin:2px 0; border-top:2px solid #333;'>", unsafe_allow_html=True)
             
-            for candidate in matched_candidates:
-                draw_packed_row(candidate, st.session_state.reset_counter)
-                
-            st.markdown("<br>", unsafe_allow_html=True)
-            # ✅ THE DEFINITIVE ACTION COMPILER: Secure trigger button processes checked cache values flawlessly!
-            if st.button("📥 Process & Compile Selected Candidate Resumes", use_container_width=True, type="primary"):
-                active_selections = [c for c in matched_candidates if st.session_state.get(f"chk_row_{c['ID']}_{st.session_state.reset_counter}", False)]
-                if active_selections:
-                    zb = build_zip_archive(active_selections)
+            for c_idx, candidate in enumerate(matched_candidates):
+                r1, r2, r3, r4, r5 = st.columns([1.0, 2.5, 1.5, 1.5, 4.5])
+                with r1: st.checkbox("", key=f"chk_{candidate['ID']}_{st.session_state.reset_counter}")
+                with r2: st.markdown(f"👤 **{candidate['NAME']}**")
+                with r3: st.write(f"{candidate['EXP']} Yrs ({candidate['TIER']})")
+                with r4: st.write(f"🎯 **{candidate['WEIGHT']}**")
+                with r5: st.markdown(candidate['SKILLS_DISP'])
+                st.markdown("<hr style='margin:2px 0; border-top:1px dashed #ccc;'>", unsafe_allow_html=True)
+        else: st.warning("⚠️ No profiles matching criteria found inside this tier bracket.")
+    else: st.warning("No candidate records matched your search parameters.")
+else: st.info("👋 Good Afternoon! Select your keyword tags inside the index dropdown list above or select a Role category dropdown on the left sidebar to begin.")
