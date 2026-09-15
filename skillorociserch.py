@@ -43,21 +43,41 @@ def get_categorized_skills_with_counts():
         
         tally = Counter(all_skills)
         cats = {
-            "🔒 Cloud Platforms": ["OCI", "AWS", "Azure", "Cloud Security"],
-            "🗄️ Database Systems": ["Oracle DBA", "Oracle Designer", "PostgreSQL", "Database Modelling", "PL/SQL", "SQL"],
-            "💻 Programming Languages": ["Python Basics", "Java", "Cobol", "Flask", "Django"],
-            "💿 Operating Systems": ["Linux", "Dos", "Mac", "Unix"],
-            "⚙️ Middleware & Tools": ["Websphere", "Git", "Docker", "Kubernetes", "Streamlit"]
+            "👔 Delivery Manager Profile": {
+                "☁️ Cloud Architecture": ["OCI", "AWS", "Azure", "Cloud Security"],
+                "📐 Solution Blueprinting": ["Database Modelling", "Oracle Designer"]
+            },
+            "🗄️ Database Administrator (DBA)": {
+                "💎 Core Oracle Engine": ["Oracle DBA", "PL/SQL", "SQL"],
+                "💾 Open-Source Data RDBMS": ["PostgreSQL"]
+            },
+            "💻 Application Developer": {
+                "🐍 Python Ecosystem": ["Python Basics", "Flask", "Django", "Streamlit"],
+                "☕ Java Core Enterprise": ["Java"]
+            },
+            "🖥️ System Administrator": {
+                "💿 Unix & Open Server OS": ["Linux", "Unix"],
+                "⚙️ Legacy Server Environments": ["Websphere", "Dos", "Mac"]
+            },
+            "🛠️ ITIL & Infrastructure Engineer": {
+                "📦 DevOps Containerization": ["Docker", "Kubernetes", "Git"],
+                "🧱 Legacy Infrastructure Core": ["Cobol"]
+            }
         }
-        output = {c: [] for c in cats.keys()}
-        output["🧩 Other Miscellaneous Skills"] = []
-        for s in tally.keys():
+        
+        tree = {}
+        for r, t_dict in cats.items(): tree[r] = {t: [] for t in t_dict.keys()}
+        tree["🧩 General Profiles"] = {"Unassigned Skills": []}
+        
+        for fs in sorted(tally.keys()):
             m = False
-            for c_name, kws in cats.items():
-                if any(k.lower() in s.lower() for k in kws):
-                    output[c_name].append(s); m = True; break
-            if not m: output["🧩 Other Miscellaneous Skills"].append(s)
-        return tally, output, len(df)
+            for r, t_dict in cats.items():
+                for t, kws in t_dict.items():
+                    if any(k.lower() in fs.lower() for k in kws):
+                        tree[r][t].append(fs); m = True; break
+                if m: break
+            if not m: tree["🧩 General Profiles"]["Unassigned Skills"].append(fs)
+        return tally, tree, len(df)
     except:
         return {}, {}, 0
 
@@ -96,7 +116,7 @@ st.title("☁️ Talent Search Workspace")
 st.write("High-volume tabular matching workstation powered by Oracle Cloud Infrastructure.")
 st.markdown("<hr>", unsafe_allow_html=True)
 
-raw_tally, categorized_skills, total_candidates = get_categorized_skills_with_counts()
+raw_tally, structured_tree, total_candidates = get_categorized_skills_with_counts()
 
 st.subheader("🤖 AI-Powered Central Search Engine")
 nlp_input = st.text_input("Type your query statement natively below:", placeholder="e.g., Find an Oracle DBA expert with OCI experience").strip()
@@ -110,14 +130,18 @@ with st.sidebar:
     st.markdown("<br>", unsafe_allow_html=True)
     selected_tier = st.radio("Select Target Bracket:", options=["All Profiles (Ignore Exp Limit)", "< 3 Yrs (Entry Level)", "4-10 Yrs (Mid-Senior)", "> 10 Yrs (Principal)"])
     st.markdown("<hr>", unsafe_allow_html=True)
-    st.write("**🛠️ Technology Competency Categories:**")
-    for cat_title, s_list in categorized_skills.items():
-        if s_list:
-            with st.expander(cat_title, expanded=False):
-                for s_name in sorted(s_list):
-                    cnt = raw_tally.get(s_name, 0)
-                    if st.checkbox(f"{s_name} ({cnt})", key=f"s_cb_{s_name.replace(' ', '_')}"):
-                        selected_sidebar_skills.append(s_name.lower())
+    st.write("**💼 Hierarchical Role-Based Access Checkbox Directory:**")
+    for r_title, tech_dict in structured_tree.items():
+        if any(len(lst) > 0 for lst in tech_dict.values()):
+            with st.expander(r_title, expanded=False):
+                for t_title, s_list in tech_dict.items():
+                    if s_list:
+                        st.markdown(f"**`{t_title}`**")
+                        for s_name in s_list:
+                            cnt = raw_tally.get(s_name, 0)
+                            if st.checkbox(f"{s_name} ({cnt})", key=f"s_cb_{s_name.replace(' ', '_')}"):
+                                selected_sidebar_skills.append(s_name.lower())
+                        st.markdown("<div style='margin-bottom:6px;'></div>", unsafe_allow_html=True)
 
 stopwords = {"find", "me", "a", "an", "developer", "engineer", "expert", "with", "experience", "skills", "show", "in", "for", "specialist"}
 nlp_tokens = [w.lower() for w in nlp_input.replace(",", " ").split() if w.lower() not in stopwords]
@@ -131,11 +155,7 @@ if len(active_keywords) > 0:
             raw_str = str(row['SKILLS_MATRIX']).strip()
             cand_exp = float(row['EXPERIENCE_YEARS'])
             
-            has_match = False
-            for kw in active_keywords:
-                if kw == "pl/sql" and "plsql" in raw_str.lower(): has_match = True
-                elif kw == "oci" and "oracle cloud infrastructure" in raw_str.lower(): has_match = True
-                elif kw in raw_str.lower(): has_match = True
+            has_match = any(kw in raw_str.lower() or (kw == "pl/sql" and "plsql" in raw_str.lower()) or (kw == "oci" and "oracle cloud infrastructure" in raw_str.lower()) for kw in active_keywords)
             if not has_match: continue
                 
             if cand_exp < 3.0: tier_label = "< 3 Yrs"
@@ -183,18 +203,3 @@ if len(active_keywords) > 0:
                 with r_col3: st.write(f"{candidate['EXP']} Yrs ({candidate['TIER']})")
                 with r_col4: st.write(f"🎯 **{candidate['WEIGHT']}**")
                 with r_col5: st.markdown(candidate['SKILLS_DISP'])
-                st.markdown("<hr style='margin:4px 0; border:0; border-top:1px dashed #ccc;'>", unsafe_allow_html=True)
-                
-            if selected_downloads:
-                st.markdown("<br>", unsafe_allow_html=True)
-                zip_data_bytes = build_zip_archive(selected_downloads)
-                st.download_button(
-                    label=f"📥 Bulk Download Selected Resumes ({len(selected_downloads)} Files Bundle)",
-                    data=zip_data_bytes, file_name="OCI_Talent_Search_Resumes.zip", mime="application/zip", use_container_width=True, type="primary"
-                )
-        else:
-            st.warning("⚠️ No profiles matching criteria found inside this tier bracket.")
-    else:
-        st.warning("No candidate records matched your search parameters.")
-else:
-    st.info("👋 Good Morning! Please type a query statement above or expand a technology category on the left sidebar to begin.")
