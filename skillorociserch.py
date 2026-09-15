@@ -1,12 +1,8 @@
-import streamlit as st
-import pandas as pd
-import oracledb
-import os, io, zipfile
+import streamlit as st, pandas as pd, oracledb, os, io, zipfile
 from collections import Counter
 
 W_DIR = os.path.join(os.getcwd(), "wallet_files")
 
-# FUNCTION 1: SECURE ORACLE DATABASE CONNECTION HANDSHAKE
 def get_db_connection():
     p = {
         "user": "ADMIN", "password": st.secrets["db_password"], "dsn": "search_low",
@@ -19,10 +15,9 @@ def get_db_connection():
     conn.outputtypehandler = bh
     return conn
 
-# FUNCTION 2: CENTRAL TAXONOMY DIRECTORY MAP (EASY TO MAINTENANCE & ADD THE ROLES)
 def get_master_taxonomy():
     return {
-        "👔 Delivery Manager": {  # ✅ Fixed Title exactly as requested
+        "Delivery Manager": {
             "☁️ Cloud Architecture": ["OCI", "AWS", "Azure", "Cloud Security"],
             "📐 Solution Blueprinting": ["Database Modelling", "Oracle Designer"],
             "🤖 Executive AI Automation": ["AI Skills"]
@@ -46,7 +41,6 @@ def get_master_taxonomy():
         }
     }
 
-# FUNCTION 3: DATA NORMALIZATION & COMPACT SIDEBAR HIERARCHY TREE COMPILER
 def get_categorized_skills_with_counts():
     try:
         conn = get_db_connection()
@@ -75,10 +69,17 @@ def get_categorized_skills_with_counts():
                 for t, kws in td.items():
                     if any(k.lower() in fs.lower() for k in kws): tree[r][t].append(fs)
         return tally, tree, len(df)
-    except:
-        return {}, {}, 0
+    except: return {}, {}, 0
 
-# FUNCTION 4: AUTOMATED IN-MEMORY MULTI-SELECT ZIP COMPRESSION STREAM
+def query_all_profiles_from_oracle():
+    try:
+        conn = get_db_connection()
+        df = pd.read_sql("SELECT id, name, email, experience_years, skills_matrix, resume_blob FROM skills", conn)
+        conn.close()
+        df.columns = [c.upper() for c in df.columns]
+        return df
+    except: return pd.DataFrame()
+
 def build_zip_archive(candidates):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -88,23 +89,9 @@ def build_zip_archive(candidates):
     buf.seek(0)
     return buf.getvalue()
 
-# FUNCTION 5: CANDIDATE DATA RETRIEVER FROM ORACLE CLOUD
-def query_all_profiles_from_oracle():
-    try:
-        conn = get_db_connection()
-        df = pd.read_sql("SELECT id, name, email, experience_years, skills_matrix, resume_blob FROM skills", conn)
-        conn.close()
-        df.columns = [c.upper() for c in df.columns]
-        return df
-    except:
-        return pd.DataFrame()
-
-# ======================================================================
-# 🚀 CORE STREAMLIT USER INTERFACE MAIN ENGINE
-# ======================================================================
 st.set_page_config(page_title="Talent Search", layout="wide")
 st.title("☁️ Talent Search Workspace")
-st.write("Modular function-driven high-volume workstation powered by Oracle Cloud Infrastructure.")
+st.write("Function-driven tabular workstation powered by Oracle Cloud Infrastructure.")
 st.markdown("<hr>", unsafe_allow_html=True)
 
 raw_tally, structured_tree, total_candidates = get_categorized_skills_with_counts()
@@ -115,12 +102,12 @@ with st.sidebar:
     st.header("🎯 Parameters")
     if st.button("🧹 Clear All Filters", use_container_width=True):
         st.cache_data.clear()
+        for k in list(st.session_state.keys()):
+            if k.startswith("s_cb_") or k.startswith("chk_"): st.session_state[k] = False
         st.rerun()
     st.markdown("<br>", unsafe_allow_html=True)
     s_tier = st.radio("Select Target Bracket:", options=["All Profiles (Ignore Exp Limit)", "< 3 Yrs (Entry Level)", "4-10 Yrs (Mid-Senior)", "> 10 Yrs (Principal)"])
     st.markdown("<hr>", unsafe_allow_html=True)
-    
-    # Render Hierarchical Checkbox Tree Layout elegantly using our master tree function variables
     for r_title, tech_dict in structured_tree.items():
         if any(len(lst) > 0 for lst in tech_dict.values()):
             with st.expander(r_title, expanded=False):
@@ -130,8 +117,7 @@ with st.sidebar:
                         for s_name in s_list:
                             cnt = raw_tally.get(s_name, 0)
                             cb_key = f"s_cb_{r_title}_{t_title}_{s_name}".replace(' ', '_').replace('💻', '').replace('🤖', '').replace('🐍', '').replace('☕', '').replace('💿', '').replace('⚙️', '').replace('📦', '').replace('🧱', '').replace('🗄️', '').replace('💎', '').replace('💾', '').replace('👔', '').replace('☁️', '').replace('📐', '')
-                            if st.checkbox(f"{s_name} ({cnt})", key=cb_key):
-                                selected_sidebar_skills.append(s_name.lower())
+                            if st.checkbox(f"{s_name} ({cnt})", key=cb_key): selected_sidebar_skills.append(s_name.lower())
 
 stopwords = {"find", "me", "a", "an", "developer", "engineer", "expert", "with", "experience", "skills", "show", "in", "for", "specialist"}
 nlp_tokens = [w.lower() for w in nlp_input.replace(",", " ").split() if w.lower() not in stopwords]
@@ -169,7 +155,7 @@ if len(active_keywords) > 0:
                 hl_list.append(f"**:red[{st_tag}]**" if mf else st_tag)
                 
             matched_candidates.append({
-                "ID": row['ID'], "NAME": str(row['NAME']).strip(), "EXP": c_exp,
+                "ID": str(row['ID']).strip(), "NAME": str(row['NAME']).strip(), "EXP": c_exp,
                 "TIER": tl, "WEIGHT": f"{exp_wt}%", "SKILLS_DISP": ", ".join(hl_list), "BLOB": row['RESUME_BLOB']
             })
             
@@ -183,11 +169,19 @@ if len(active_keywords) > 0:
             with c5: st.write("**Technologies Found**")
             st.markdown("<hr style='margin:2px 0; border-top:2px solid #333;'>", unsafe_allow_html=True)
             
-            selected_downloads = []
             for c_idx, candidate in enumerate(matched_candidates):
                 r1, r2, r3, r4, r5 = st.columns([1.0, 2.5, 1.5, 1.5, 4.5])
-                with r1:
-                    if st.checkbox("", key=f"dl_{candidate['ID']}_{c_idx}"): selected_downloads.append(candidate)
+                with r1: st.checkbox("", key=f"chk_{candidate['ID']}")
                 with r2: st.markdown(f"👤 **{candidate['NAME']}**")
                 with r3: st.write(f"{candidate['EXP']} Yrs ({candidate['TIER']})")
                 with r4: st.write(f"🎯 **{candidate['WEIGHT']}**")
+                with r5: st.markdown(candidate['SKILLS_DISP'])
+                st.markdown("<hr style='margin:2px 0; border-top:1px dashed #ccc;'>", unsafe_allow_html=True)
+                
+            active_selections = [c for c in matched_candidates if st.session_state.get(f"chk_{c['ID']}", False)]
+            if active_selections:
+                st.markdown("<br>", unsafe_allow_html=True)
+                zb = build_zip_archive(active_selections)
+                st.download_button("📥 Download Bundle", zb, "Resumes.zip", "application/zip", use_container_width=True)
+        else: st.warning("⚠️ No profiles matching criteria found inside this tier bracket.")
+    else: st.warning("No candidate records matched your search parameters.")
