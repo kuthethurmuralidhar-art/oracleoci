@@ -16,7 +16,7 @@ def get_db_connection():
 
 def get_master_taxonomy():
     return {
-        "Delivery Manager": {"☁️ Cloud": ["OCI", "AWS", "Azure"], "📐 Design": ["Modelling", "Designer"], "🤖 AI": ["AI Skills"]},
+        "Delivery Manager": {"☁️ Cloud": ["OCI", "AWS", "Azure"], "📐 Design": ["Database Modelling", "Oracle Designer"], "🤖 AI": ["AI Skills"]},
         "Database Administrator (DBA)": {"💎 Core": ["Oracle DBA", "PL/SQL", "SQL"], "💾 Open": ["PostgreSQL"]},
         "Application Developer": {"🐍 Python": ["Python", "Flask", "Django", "Streamlit"], "☕ Java": ["Java"], "🤖 AI": ["AI Skills"]},
         "System Administrator": {"💿 Unix": ["Linux", "Unix"], "⚙️ Legacy": ["Websphere", "Dos", "Mac"]},
@@ -31,14 +31,24 @@ def query_matched_profiles_via_stored_function(keyword=None, location=None):
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            kw_param = keyword if isinstance(keyword, list) and keyword else (keyword if keyword else None)
-            loc_param = location if isinstance(location, list) and location else (location if location else None)
+            # ✅ THE TYPE ARRAYS UNPACKING CURE: Natively flattens list blocks into VARCHAR2 clean text string rows!
+            if isinstance(keyword, list):
+                kw_param = ",".join(keyword).strip() if keyword else None
+            else:
+                kw_param = str(keyword).strip() if keyword else None
+                
+            if isinstance(location, list):
+                loc_param = ",".join(location).strip() if location else None
+            else:
+                loc_param = str(location).strip() if location else None
+                
+            if kw_param == "": kw_param = None
+            if loc_param == "": loc_param = None
             
             ref_cursor = cursor.callfunc("GET_MATCHED_CANDIDATES", oracledb.DB_TYPE_CURSOR, [kw_param, loc_param])
             rows = ref_cursor.fetchall()
             
-            # ✅ THE FETCHINFO FIX: Safely extracts the column text string name from tuple coordinate 0!
-            cols = [col[0].upper() for col in ref_cursor.description]
+            cols = [col.name.upper() for col in ref_cursor.description]
             
             results = []
             for row in rows:
@@ -65,8 +75,12 @@ def query_matched_profiles_via_stored_function(keyword=None, location=None):
         try:
             api_url = "http://localhost:8000/api/candidates"
             payload_params = {}
-            if keyword: payload_params["keyword"] = keyword
-            if location: payload_params["location"] = location
+            
+            # For local FastAPI requests, handle lists elegantly via CSV serialization layers
+            if keyword:
+                payload_params["keyword"] = ",".join(keyword) if isinstance(keyword, list) else str(keyword)
+            if location:
+                payload_params["location"] = ",".join(location) if isinstance(location, list) else str(location)
             
             response = requests.get(api_url, params=payload_params, timeout=5)
             if response.status_code == 200:
@@ -115,7 +129,7 @@ def apply_corporate_styles(wb):
                 cell = ws.cell(row=r, column=c)
                 if r == 1: cell.font = f_hdr; cell.fill = fill_hdr
                 else:
-                    cell.font = f_cel; cell.border = border_thin
+                    cell.font = f_cel; border = border_thin
                     cell.fill = fill_zb if r % 2 == 0 else fill_wh
                     if str(cell.value).startswith("Go to") or str(cell.value).startswith("2026-"):
                         cell.alignment = Alignment(horizontal="center", vertical="center")
