@@ -1,6 +1,7 @@
 import streamlit as st, pandas as pd, os
 from collections import Counter
-from utils import get_db_connection, get_master_taxonomy, query_all_profiles_from_oracle, build_zip_archive, init_page_headers
+# ✅ THE DISCONNECTED IMPORT FIX: References the correct, active API handshake courier function!
+from utils import get_db_connection, get_master_taxonomy, query_matched_profiles_via_stored_function, build_zip_archive, init_page_headers
 
 init_page_headers()
 
@@ -52,7 +53,6 @@ with st.sidebar:
         st.session_state.reset_counter += 1
         st.rerun()
     
-    # ✅ INJECTS CUSTOM TARGETED SPACING OVERRIDES TO RECLAIM INTERFACE SPACE NATIVELY!
     st.markdown("""
         <style>
             div[data-testid="stSidebar"] div.stRadio { margin-top: -15px !important; padding-top: 0px !important; }
@@ -61,21 +61,17 @@ with st.sidebar:
         </style>
     """, unsafe_allow_html=True)
     
-    # ✅ 1. EXPERIENCE BRACKET (Elevated Tier with compact layout choices right below it)
     s_tier = st.radio("Select Target Bracket:", options=["All Profiles (Ignore Exp Limit)", "< 3 Yrs (Entry Level)", "4-10 Yrs (Mid-Senior)", "> 10 Yrs (Principal)"])
     st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
     
-    # ✅ 2. LOCATION CITIES FILTER
     st.write("**📍 Multi-Location Filter:**")
     selected_locations_filter = st.multiselect("Choose Target Cities:", options=unique_locations, placeholder="All Cities Active...", key=f"loc_ms_{st.session_state.reset_counter}")
     st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
     
-    # ✅ 3. MULTI-ROLE SELECTION PANEL
     st.write("**👔 Multi-Role Selection Panel:**")
     active_selected_roles = st.multiselect("Select Target Professional Roles:", options=list(structured_tree.keys()), placeholder="Click to pick target roles...", key=f"roles_ms_{st.session_state.reset_counter}")
     st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
     
-    # ✅ 4. ALWAYS VISIBLE DYNAMIC SKILLS MATRIX Dropdown Menu
     st.write("**🛠️ Chained Competency Skills Index:**")
     chained_available_skills = []
     if active_selected_roles:
@@ -96,7 +92,12 @@ sidebar_tokens = [s.lower().strip() for s in selected_sidebar_skills]
 active_keywords = list(set(nlp_tokens + sidebar_tokens))
 
 if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
-    df_raw = query_all_profiles_from_oracle()
+    # ✅ REDIRECTED HOOK: Calls the active REST API pipeline route function instead of raw SQL!
+    kw_arg = active_keywords[0] if active_keywords else None
+    loc_arg = selected_locations_filter[0] if selected_locations_filter else None
+    
+    df_raw = query_matched_profiles_via_stored_function(keyword=kw_arg, location=loc_arg)
+    
     if not df_raw.empty:
         matched_candidates = []
         raw_records = df_raw.to_dict(orient="records")
