@@ -79,10 +79,8 @@ sidebar_tokens = [s.lower().strip() for s in selected_sidebar_skills]
 active_keywords = list(set(nlp_tokens + sidebar_tokens))
 
 if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
-    # ✅ THE STRATEGIC COURIER STRING CURE: Unifies list elements into clean flat CSV values before dispatching HTTP calls!
     kw_arg = ",".join(active_keywords) if active_keywords else None
     loc_arg = ",".join(selected_locations_filter) if selected_locations_filter else None
-    
     df_raw = query_matched_profiles_via_stored_function(keyword=kw_arg, location=loc_arg)
     
     if not df_raw.empty:
@@ -92,10 +90,8 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
             raw_str = str(item.get('SKILLS_MATRIX', '')).strip()
             c_exp = float(item.get('EXPERIENCE_YEARS', 0.0))
             c_loc = str(item.get('LOCATION', 'General')).strip().title()
-            
             if selected_locations_filter and c_loc not in selected_locations_filter: continue
             if active_keywords and not any(is_fuzzy_match(kw, raw_str) for kw in active_keywords): continue
-            
             if c_exp < 3.0: tl, exp_wt = "< 3 Yrs", int((c_exp / 3.0) * 100)
             elif 4.0 <= c_exp <= 10.0: tl, exp_wt = "4-10 Yrs", int((c_exp / 10.0) * 100)
             else: tl, exp_wt = "> 10 Yrs", min(int((c_exp / 12.0) * 100), 100)
@@ -103,14 +99,12 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
             if s_tier == "< 3 Yrs (Entry Level)" and tl != "< 3 Yrs": continue
             if s_tier == "4-10 Yrs (Mid-Senior)" and tl != "4-10 Yrs": continue
             if s_tier == "> 10 Yrs (Principal)" and tl != "> 10 Yrs": continue
-            
             disp_skills = raw_str.split("Skills:")[-1].strip() if "Skills:" in raw_str else raw_str
             hl_list = []
             for tag in disp_skills.split(","):
                 st_tag = tag.strip()
                 mf = active_keywords and any(is_fuzzy_match(kw, st_tag) for kw in active_keywords)
                 hl_list.append(f"**:red[{st_tag}]**" if mf else st_tag)
-                
             matched_candidates.append({
                 "ID": str(item.get('ID', '')).strip(), "NAME": str(item.get('NAME', '')).strip(), "EXP": c_exp, "LOCATION": c_loc,
                 "TIER": tl, "WEIGHT": f"{exp_wt}%", "SKILLS_DISP": ", ".join(hl_list), "BLOB": item.get('RESUME_BLOB', None)
@@ -120,7 +114,10 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
             st.markdown(f"### 🎯 Shortlisting Workspace Matrix ({len(matched_candidates)} Profiles Found)")
             all_keys = [f"chk_{cand['ID']}_{st.session_state.reset_counter}" for cand in matched_candidates]
             master_key = f"sel_all_{st.session_state.reset_counter}"
-            all_checked_by_user = all(st.session_state.get(k, False) for k in all_keys) if all_keys else False
+            
+            # ✅ PRE-FLIGHT SELECTION SWEEP ENGINE: Calculates true state intersections cleanly!
+            if all_keys and all(st.session_state.get(k, False) for k in all_keys): all_checked_by_user = True
+            else: all_checked_by_user = False
 
             c0, c1, c2, c3, c4, c5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
             with c0: select_all = st.checkbox("All", value=all_checked_by_user, key=master_key)
@@ -135,8 +132,11 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
             for c in matched_candidates:
                 r0, r1, r2, r3, r4, r5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
                 row_key = f"chk_{c['ID']}_{st.session_state.reset_counter}"
+                
+                # Bi-directional sync handshake execution pass
                 if master_key in st.session_state and st.session_state.get("_last_all") != select_all:
                     st.session_state[row_key] = select_all
+                    
                 with r0: is_checked = st.checkbox("", key=row_key)
                 if is_checked: final_dl_list.append(c)
                 with r1: st.markdown(f"👤 **{c['NAME']}**")
@@ -147,11 +147,17 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
                 st.markdown("<hr style='margin:2px 0; border-top:1px dashed #ccc;'>", unsafe_allow_html=True)
                 
             st.session_state["_last_all"] = select_all
+            
+            # ✅ STABLE RESPONSIVE GENERATOR: Keep download layout active and completely synchronized!
             if final_dl_list:
                 st.markdown("<br>", unsafe_allow_html=True)
                 zb_bytes = build_zip_archive(final_dl_list)
                 st.download_button(f"📥 Download Shortlisted ZIP Bundle ({len(final_dl_list)} Resumes)", zb_bytes, "Shortlisted_Resumes.zip", "application/zip", use_container_width=True, type="primary")
             else: st.info("💡 Pro Tip: Tick the 'All' checkbox at the header or choose row cells below to download.")
+            
+            # ✅ RE-RERUN SYNC GUARD: Automatically refreshes the UI frame state if the master checkbox slips out of alignment!
+            current_all_checked = all(st.session_state.get(k, False) for k in all_keys) if all_keys else False
+            if select_all and not current_all_checked: st.rerun()
         else: st.warning("⚠️ No profiles matching criteria found inside this bracket filter.")
     else: st.warning("No candidate records matched your search parameters.")
 else: st.info("👋 Select your Target Roles and Location filters on the left sidebar parameter panel to begin shortlisting.")
