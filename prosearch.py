@@ -37,12 +37,10 @@ def get_categorized_skills_with_counts():
 if "reset_counter" not in st.session_state: st.session_state.reset_counter = 0
 
 raw_tally, structured_tree, unique_locations, total_candidates = get_categorized_skills_with_counts()
-
-# Central Autocomplete Search Bar
+autocomplete_options = sorted(list(raw_tally.keys()))
 nlp_selection_tags = st.multiselect(
     "Select technical competency keywords from the unified index:", 
-    options=sorted(list(raw_tally.keys())), 
-    placeholder="Start typing or click to select skills...", 
+    options=autocomplete_options, placeholder="Start typing or click to select skills...", 
     key=f"main_search_index_{st.session_state.reset_counter}"
 )
 
@@ -53,25 +51,45 @@ with st.sidebar:
         st.cache_data.clear()
         st.session_state.reset_counter += 1
         st.rerun()
-    s_tier = st.radio("Select Target Bracket:", options=["All Profiles (Ignore Exp Limit)", "< 3 Yrs (Entry Level)", "4-10 Yrs (Mid-Senior)", "> 10 Yrs (Principal)"])
-    st.markdown("<hr>", unsafe_allow_html=True)
-    selected_locations_filter = st.multiselect("Choose Target Cities:", options=unique_locations, placeholder="All Cities Active...", key=f"loc_ms_{st.session_state.reset_counter}")
-    st.markdown("<hr>", unsafe_allow_html=True)
-    active_selected_roles = st.multiselect("Select Target Professional Roles:", options=list(structured_tree.keys()), placeholder="Click to pick target roles...", key=f"roles_ms_{st.session_state.reset_counter}")
     
+    # ✅ INJECTS CUSTOM TARGETED SPACING OVERRIDES TO RECLAIM INTERFACE SPACE NATIVELY!
+    st.markdown("""
+        <style>
+            div[data-testid="stSidebar"] div.stRadio { margin-top: -15px !important; padding-top: 0px !important; }
+            div[data-testid="stSidebar"] div.stRadio > label { margin-bottom: 2px !important; font-weight: bold !important; }
+            div[data-testid="stSidebar"] div[data-testid="stWidgetLabel"] { margin-bottom: 4px !important; }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # ✅ 1. EXPERIENCE BRACKET (Elevated Tier with compact layout choices right below it)
+    s_tier = st.radio("Select Target Bracket:", options=["All Profiles (Ignore Exp Limit)", "< 3 Yrs (Entry Level)", "4-10 Yrs (Mid-Senior)", "> 10 Yrs (Principal)"])
+    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+    
+    # ✅ 2. LOCATION CITIES FILTER
+    st.write("**📍 Multi-Location Filter:**")
+    selected_locations_filter = st.multiselect("Choose Target Cities:", options=unique_locations, placeholder="All Cities Active...", key=f"loc_ms_{st.session_state.reset_counter}")
+    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+    
+    # ✅ 3. MULTI-ROLE SELECTION PANEL
+    st.write("**👔 Multi-Role Selection Panel:**")
+    active_selected_roles = st.multiselect("Select Target Professional Roles:", options=list(structured_tree.keys()), placeholder="Click to pick target roles...", key=f"roles_ms_{st.session_state.reset_counter}")
+    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+    
+    # ✅ 4. ALWAYS VISIBLE DYNAMIC SKILLS MATRIX Dropdown Menu
+    st.write("**🛠️ Chained Competency Skills Index:**")
+    chained_available_skills = []
     if active_selected_roles:
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.write("**🛠️ Chained Competency Skills Index:**")
-        chained_available_skills = []
         for typed_role in active_selected_roles:
             matched_key = next((k for k in structured_tree.keys() if typed_role.lower() in k.lower() or k.lower() in typed_role.lower()), None)
             if matched_key:
                 for s_list in structured_tree.get(matched_key, {}).values():
                     for s_name in s_list:
                         if s_name not in chained_available_skills: chained_available_skills.append(s_name)
-        if chained_available_skills:
-            active_selected_skills = st.multiselect("Select chained technologies:", options=sorted(chained_available_skills), placeholder="Pick skills matching selected roles...", key=f"chained_skills_ms_{st.session_state.reset_counter}")
-            for tag in active_selected_skills: selected_sidebar_skills.append(tag.lower().strip())
+    else:
+        chained_available_skills = list(raw_tally.keys())
+        
+    active_selected_skills = st.multiselect("Select chained technologies:", options=sorted(chained_available_skills), placeholder="Pick target technologies...", key=f"chained_skills_ms_{st.session_state.reset_counter}")
+    for tag in active_selected_skills: selected_sidebar_skills.append(tag.lower().strip())
 
 nlp_tokens = [t.lower().strip() for t in nlp_selection_tags]
 sidebar_tokens = [s.lower().strip() for s in selected_sidebar_skills]
@@ -81,12 +99,9 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
     df_raw = query_all_profiles_from_oracle()
     if not df_raw.empty:
         matched_candidates = []
-        
-        # ✅ THE CRITICAL FIX: Convert DataFrame to native dictionary arrays to completely kill pointer alignment shifts!
         raw_records = df_raw.to_dict(orient="records")
         
         for item in raw_records:
-            # Force explicit key tracking direct from each clean independent candidate row segment
             raw_str = str(item.get('SKILLS_MATRIX', '')).strip()
             c_exp = float(item.get('EXPERIENCE_YEARS', 0.0))
             c_loc = str(item.get('LOCATION', 'General')).strip().title()
