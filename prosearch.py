@@ -1,6 +1,5 @@
 import streamlit as st, pandas as pd, os
 from collections import Counter
-# ✅ THE DISCONNECTED IMPORT FIX: References the correct, active API handshake courier function!
 from utils import get_db_connection, get_master_taxonomy, query_matched_profiles_via_stored_function, build_zip_archive, init_page_headers
 
 init_page_headers()
@@ -62,15 +61,15 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     
     s_tier = st.radio("Select Target Bracket:", options=["All Profiles (Ignore Exp Limit)", "< 3 Yrs (Entry Level)", "4-10 Yrs (Mid-Senior)", "> 10 Yrs (Principal)"])
-    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin:16px 0;'>", unsafe_allow_html=True)
     
     st.write("**📍 Multi-Location Filter:**")
     selected_locations_filter = st.multiselect("Choose Target Cities:", options=unique_locations, placeholder="All Cities Active...", key=f"loc_ms_{st.session_state.reset_counter}")
-    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin:16px 0;'>", unsafe_allow_html=True)
     
     st.write("**👔 Multi-Role Selection Panel:**")
     active_selected_roles = st.multiselect("Select Target Professional Roles:", options=list(structured_tree.keys()), placeholder="Click to pick target roles...", key=f"roles_ms_{st.session_state.reset_counter}")
-    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin:16px 0;'>", unsafe_allow_html=True)
     
     st.write("**🛠️ Chained Competency Skills Index:**")
     chained_available_skills = []
@@ -92,9 +91,8 @@ sidebar_tokens = [s.lower().strip() for s in selected_sidebar_skills]
 active_keywords = list(set(nlp_tokens + sidebar_tokens))
 
 if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
-    # ✅ REDIRECTED HOOK: Calls the active REST API pipeline route function instead of raw SQL!
-    kw_arg = active_keywords[0] if active_keywords else None
-    loc_arg = selected_locations_filter[0] if selected_locations_filter else None
+    kw_arg = active_keywords if active_keywords else None
+    loc_arg = selected_locations_filter if selected_locations_filter else None
     
     df_raw = query_matched_profiles_via_stored_function(keyword=kw_arg, location=loc_arg)
     
@@ -132,30 +130,42 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
             
         if matched_candidates:
             st.markdown(f"### 🎯 Shortlisting Workspace Matrix ({len(matched_candidates)} Profiles Found)")
-            dl_list = [c for c in matched_candidates if st.session_state.get(f"chk_{c['ID']}_{st.session_state.reset_counter}", False)]
-            if dl_list:
-                zb_bytes = build_zip_archive(dl_list)
-                st.download_button(f"📥 Download Shortlisted ZIP Bundle ({len(dl_list)} Resumes)", zb_bytes, "Shortlisted_Resumes.zip", "application/zip", use_container_width=True, type="primary")
-            else: st.info("💡 Pro Tip: Tick candidate row checkboxes below to shortlist and download.")
-            st.markdown("<br>", unsafe_allow_html=True)
             
+            # Setup layout columns ahead of header render
             c0, c1, c2, c3, c4, c5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
-            c0.write("**Shortlist**")
-            c1.write("**Candidate Name**")
-            c2.write("**Location**")
-            c3.write("**Experience**")
-            c4.write("**Exp Weight**")
-            c5.write("**Technologies Found**")
+            
+            # ✅ THE UX MASTERPIECE: "Select All" toggle checkbox inside header cell column 0!
+            with c0: select_all = st.checkbox("All", key=f"sel_all_{st.session_state.reset_counter}")
+            with c1: c1.write("**Candidate Name**")
+            with c2: c2.write("**Location**")
+            with c3: c3.write("**Experience**")
+            with c4: c4.write("**Exp Weight**")
+            with c5: c5.write("**Technologies Found**")
             st.markdown("<hr style='margin:2px 0; border-top:2px solid #333;'>", unsafe_allow_html=True)
+            
+            # Formulate tracking list bound dynamically to the master select_all check value state
+            final_dl_list = []
+            
             for c in matched_candidates:
                 r0, r1, r2, r3, r4, r5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
-                r0.checkbox("", key=f"chk_{c['ID']}_{st.session_state.reset_counter}")
+                # Row checks inherit the true/false value of select_all as their default value
+                with r0: is_checked = st.checkbox("", value=select_all, key=f"chk_{c['ID']}_{st.session_state.reset_counter}")
+                if is_checked: final_dl_list.append(c)
+                
                 r1.markdown(f"👤 **{c['NAME']}**")
                 r2.write(f"📍 **{c['LOCATION']}**")
                 r3.write(f"{c['EXP']} Yrs ({c['TIER']})")
                 r4.write(f"🎯 **{c['WEIGHT']}**")
                 r5.markdown(c['SKILLS_DISP'])
                 st.markdown("<hr style='margin:2px 0; border-top:1px dashed #ccc;'>", unsafe_allow_html=True)
+                
+            # Repositioned bulk downloader button right below matrix grids safely
+            if final_dl_list:
+                st.markdown("<br>", unsafe_allow_html=True)
+                zb_bytes = build_zip_archive(final_dl_list)
+                st.download_button(f"📥 Download Shortlisted ZIP Bundle ({len(final_dl_list)} Resumes)", zb_bytes, "Shortlisted_Resumes.zip", "application/zip", use_container_width=True, type="primary")
+            else:
+                st.info("💡 Pro Tip: Tick the 'All' checkbox at the header or choose row cells below to shortlist and download.")
         else: st.warning("⚠️ No profiles matching criteria found inside this bracket filter.")
     else: st.warning("No candidate records matched your search parameters.")
 else: st.info("👋 Select your Target Roles and Location filters on the left sidebar parameter panel to begin shortlisting.")
