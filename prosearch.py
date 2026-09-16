@@ -1,39 +1,24 @@
-import streamlit as st, pandas as pd, oracledb, os, io, zipfile
+import streamlit as st, pandas as pd, os
 from collections import Counter
+from utils import get_db_connection, get_master_taxonomy, query_all_profiles_from_oracle, build_zip_archive, init_page_headers
 
-W_DIR = os.path.join(os.getcwd(), "wallet_files")
+init_page_headers()
 
-def get_db_connection():
-    p = {
-        "user": "ADMIN", "password": st.secrets["db_password"], "dsn": "search_low",
-        "config_dir": W_DIR, "wallet_location": W_DIR, "wallet_password": st.secrets["wallet_password"],
-        "ssl_server_dn_match": False
-    }
-    def bh(cursor, name, dtype, size, prec, scale):
-        if dtype == oracledb.DB_TYPE_BLOB: return cursor.var(bytes, arraysize=cursor.arraysize)
-    conn = oracledb.connect(**p)
-    conn.outputtypehandler = bh
-    return conn
-
-# ✅ HYPER-COMPACT ULTRA-CLEAN DICTIONARY DIRECTORY MATRIX
-def get_master_taxonomy():
-    return {
-        "Delivery Manager": {"☁️ Cloud": ["OCI", "AWS", "Azure"], "📐 Design": ["Modelling", "Designer"], "🤖 AI": ["AI Skills"]},
-        "Database Administrator": {"💎 Oracle": ["Oracle DBA", "PL/SQL", "SQL"], "💾 Open": ["PostgreSQL"]},
-        "Application Developer": {"🐍 Python": ["Python", "Flask", "Django", "Streamlit"], "☕ Java": ["Java"], "🤖 AI": ["AI Skills"]},
-        "System Administrator": {"💿 Unix": ["Linux", "Unix"], "⚙️ Legacy": ["Websphere", "Dos", "Mac"]},
-        "ITIL & Infrastructure Engineer": {"📦 DevOps": ["Docker", "Kubernetes", "Git"], "🧱 Legacy": ["Cobol"]}
-    }
+def is_fuzzy_match(kw, target_str):
+    return kw.lower().strip() in target_str.lower().strip()
 
 def get_categorized_skills_with_counts():
     try:
         conn = get_db_connection()
-        df = pd.read_sql("SELECT skills_matrix FROM skills", conn)
+        df = pd.read_sql("SELECT skills_matrix, location FROM skills", conn)
         conn.close()
-        if df.empty: return {}, {}, 0
+        if df.empty: return {}, {}, [], 0
         df.columns = [c.upper() for c in df.columns]
-        all_s = []
+        all_s, all_locs = [], []
         n_map = {"plsql": "PL/SQL", "pl/sql": "PL/SQL", "oracle dba": "Oracle DBA", "oci": "OCI", "python basics": "Python", "python": "Python", "ai skills": "AI Skills", "ai": "AI Skills", "machine learning": "AI Skills"}
+        for loc in df['LOCATION'].astype(str).dropna():
+            l_cl = loc.strip().title()
+            if l_cl and l_cl not in all_locs: all_locs.append(l_cl)
         for rm in df['SKILLS_MATRIX'].astype(str).dropna():
             sp = rm.split("Skills:")[-1] if "Skills:" in rm else rm
             for it in sp.split(","):
@@ -46,128 +31,115 @@ def get_categorized_skills_with_counts():
             for r, td in cats.items():
                 for t, kws in td.items():
                     if any(k.lower() in fs.lower() for k in kws): tree[r][t].append(fs)
-        return tally, tree, len(df)
-    except: return {}, {}, 0
-
-def query_all_profiles_from_oracle():
-    try:
-        conn = get_db_connection()
-        df = pd.read_sql("SELECT id, name, email, experience_years, skills_matrix, resume_blob FROM skills", conn)
-        conn.close()
-        df.columns = [c.upper() for c in df.columns]
-        return df
-    except: return pd.DataFrame()
-
-def build_zip_archive(candidates):
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for c in candidates:
-            if c["BLOB"] is not None and len(c["BLOB"]) > 0:
-                zf.writestr(f"{c['NAME'].replace(' ', '_')}_Resume.pdf", c["BLOB"])
-    buf.seek(0)
-    return buf.getvalue()
-
-st.set_page_config(page_title="Talent Search", layout="wide")
-st.title("☁️ Talent Search Workspace")
-st.write("Function-driven tabular workstation powered by Oracle Cloud Infrastructure.")
-st.markdown("<hr>", unsafe_allow_html=True)
+        return tally, tree, sorted(all_locs), len(df)
+    except: return {}, {}, [], 0
 
 if "reset_counter" not in st.session_state: st.session_state.reset_counter = 0
 
-raw_tally, structured_tree, total_candidates = get_categorized_skills_with_counts()
-autocomplete_options = sorted(list(raw_tally.keys()))
+raw_tally, structured_tree, unique_locations, total_candidates = get_categorized_skills_with_counts()
+
+# Central Autocomplete Search Bar
 nlp_selection_tags = st.multiselect(
-    "Select technical competency keywords from the index dropdown:",
-    options=autocomplete_options, placeholder="Start typing or click to select skills...",
+    "Select technical competency keywords from the unified index:", 
+    options=sorted(list(raw_tally.keys())), 
+    placeholder="Start typing or click to select skills...", 
     key=f"main_search_index_{st.session_state.reset_counter}"
 )
 
-selected_sidebar_skills = []
+selected_sidebar_skills, selected_locations_filter = [], []
 with st.sidebar:
     st.header("🎯 Parameters")
     if st.button("🧹 Clear All Filters", use_container_width=True):
         st.cache_data.clear()
         st.session_state.reset_counter += 1
         st.rerun()
-    st.markdown("<br>", unsafe_allow_html=True)
     s_tier = st.radio("Select Target Bracket:", options=["All Profiles (Ignore Exp Limit)", "< 3 Yrs (Entry Level)", "4-10 Yrs (Mid-Senior)", "> 10 Yrs (Principal)"])
     st.markdown("<hr>", unsafe_allow_html=True)
-    st.write("**💼 Role Multi-Select Dropdowns:**")
-    for r_title, tech_dict in structured_tree.items():
-        role_available_skills = []
-        for t_title, s_list in tech_dict.items():
-            for s_name in s_list:
-                cnt = raw_tally.get(s_name, 0)
-                if cnt > 0 and s_name not in role_available_skills: role_available_skills.append(s_name)
-        if role_available_skills:
-            st.markdown(f"**`{r_title}`**")
-            box_uid_key = f"sb_drop_{r_title.replace(' ', '_')}_{st.session_state.reset_counter}"
-            selected_box_tags = st.multiselect(f"Choose {r_title} skills:", options=sorted(role_available_skills), placeholder="Click to pick skills...", label_visibility="collapsed", key=box_uid_key)
-            for tag in selected_box_tags: selected_sidebar_skills.append(tag.lower())
-            st.markdown("<div style='margin-bottom:8px;'></div>", unsafe_allow_html=True)
+    selected_locations_filter = st.multiselect("Choose Target Cities:", options=unique_locations, placeholder="All Cities Active...", key=f"loc_ms_{st.session_state.reset_counter}")
+    st.markdown("<hr>", unsafe_allow_html=True)
+    active_selected_roles = st.multiselect("Select Target Professional Roles:", options=list(structured_tree.keys()), placeholder="Click to pick target roles...", key=f"roles_ms_{st.session_state.reset_counter}")
+    
+    if active_selected_roles:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.write("**🛠️ Chained Competency Skills Index:**")
+        chained_available_skills = []
+        for typed_role in active_selected_roles:
+            matched_key = next((k for k in structured_tree.keys() if typed_role.lower() in k.lower() or k.lower() in typed_role.lower()), None)
+            if matched_key:
+                for s_list in structured_tree.get(matched_key, {}).values():
+                    for s_name in s_list:
+                        if s_name not in chained_available_skills: chained_available_skills.append(s_name)
+        if chained_available_skills:
+            active_selected_skills = st.multiselect("Select chained technologies:", options=sorted(chained_available_skills), placeholder="Pick skills matching selected roles...", key=f"chained_skills_ms_{st.session_state.reset_counter}")
+            for tag in active_selected_skills: selected_sidebar_skills.append(tag.lower().strip())
 
-nlp_tokens = [t.lower() for t in nlp_selection_tags]
-active_keywords = list(set(selected_sidebar_skills + nlp_tokens))
+nlp_tokens = [t.lower().strip() for t in nlp_selection_tags]
+sidebar_tokens = [s.lower().strip() for s in selected_sidebar_skills]
+active_keywords = list(set(nlp_tokens + sidebar_tokens))
 
-if len(active_keywords) > 0:
-    raw_df = query_all_profiles_from_oracle()
-    if not raw_df.empty:
+if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
+    df_raw = query_all_profiles_from_oracle()
+    if not df_raw.empty:
         matched_candidates = []
-        for idx, row in raw_df.iterrows():
-            raw_str = str(row['SKILLS_MATRIX']).strip()
-            c_exp = float(row['EXPERIENCE_YEARS'])
-            hm = any(kw in raw_str.lower() or (kw == "pl/sql" and "plsql" in raw_str.lower()) or (kw == "oci" and "oracle cloud infrastructure" in raw_str.lower()) or (kw == "python" and "python basics" in raw_str.lower()) or (kw == "ai skills" and "machine learning" in raw_str.lower()) for kw in active_keywords)
-            if not hm: continue
-            if c_exp < 3.0: tl = "< 3 Yrs"
-            elif 4.0 <= c_exp <= 10.0: tl = "4-10 Yrs"
-            else: tl = "> 10 Yrs"
-            if s_tier == "< 3 Yrs (Entry Level)" and tl != "< 3 Yrs": continue
-            elif s_tier == "4-10 Yrs (Mid-Senior)" and tl != "4-10 Yrs": continue
-            elif s_tier == "> 10 Yrs (Principal)" and tl != "> 10 Yrs": continue
+        
+        # ✅ THE CRITICAL FIX: Convert DataFrame to native dictionary arrays to completely kill pointer alignment shifts!
+        raw_records = df_raw.to_dict(orient="records")
+        
+        for item in raw_records:
+            # Force explicit key tracking direct from each clean independent candidate row segment
+            raw_str = str(item.get('SKILLS_MATRIX', '')).strip()
+            c_exp = float(item.get('EXPERIENCE_YEARS', 0.0))
+            c_loc = str(item.get('LOCATION', 'General')).strip().title()
+            
+            if selected_locations_filter and c_loc not in selected_locations_filter: continue
+            if active_keywords and not any(is_fuzzy_match(kw, raw_str) for kw in active_keywords): continue
+            
+            if c_exp < 3.0: tl, exp_wt = "< 3 Yrs", int((c_exp / 3.0) * 100)
+            elif 4.0 <= c_exp <= 10.0: tl, exp_wt = "4-10 Yrs", int((c_exp / 10.0) * 100)
+            else: tl, exp_wt = "> 10 Yrs", min(int((c_exp / 12.0) * 100), 100)
             if s_tier == "All Profiles (Ignore Exp Limit)": exp_wt = 100
-            elif s_tier == "< 3 Yrs (Entry Level)": exp_wt = int((c_exp / 3.0) * 100)
-            elif s_tier == "4-10 Yrs (Mid-Senior)": exp_wt = int((c_exp / 10.0) * 100)
-            elif s_tier == "> 10 Yrs (Principal)": exp_wt = min(int((c_exp / 12.0) * 100), 100)
+            if s_tier == "< 3 Yrs (Entry Level)" and tl != "< 3 Yrs": continue
+            if s_tier == "4-10 Yrs (Mid-Senior)" and tl != "4-10 Yrs": continue
+            if s_tier == "> 10 Yrs (Principal)" and tl != "> 10 Yrs": continue
+            
             disp_skills = raw_str.split("Skills:")[-1].strip() if "Skills:" in raw_str else raw_str
             hl_list = []
             for tag in disp_skills.split(","):
                 st_tag = tag.strip()
-                mf = any(kw in st_tag.lower() or (kw == "pl/sql" and "plsql" in st_tag.lower()) or (kw == "oci" and "oracle cloud infrastructure" in st_tag.lower()) or (kw == "python" and "python basics" in st_tag.lower()) or (kw == "ai skills" and "machine learning" in raw_str.lower()) for kw in active_keywords)
+                mf = active_keywords and any(is_fuzzy_match(kw, st_tag) for kw in active_keywords)
                 hl_list.append(f"**:red[{st_tag}]**" if mf else st_tag)
+                
             matched_candidates.append({
-                "ID": str(row['ID']).strip(), "NAME": str(row['NAME']).strip(), "EXP": c_exp,
-                "TIER": tl, "WEIGHT": f"{exp_wt}%", "SKILLS_DISP": ", ".join(hl_list), "BLOB": row['RESUME_BLOB']
+                "ID": str(item.get('ID', '')).strip(), "NAME": str(item.get('NAME', '')).strip(), "EXP": c_exp, "LOCATION": c_loc,
+                "TIER": tl, "WEIGHT": f"{exp_wt}%", "SKILLS_DISP": ", ".join(hl_list), "BLOB": item.get('RESUME_BLOB', None)
             })
+            
         if matched_candidates:
-            st.markdown(f"### 🎯 Matched Candidates ({len(matched_candidates)} Profiles Found)")
-            
-            # ✅ SCANNER BLOCK: Pulls active ticked selections out of session state cache dynamically
+            st.markdown(f"### 🎯 Shortlisting Workspace Matrix ({len(matched_candidates)} Profiles Found)")
             dl_list = [c for c in matched_candidates if st.session_state.get(f"chk_{c['ID']}_{st.session_state.reset_counter}", False)]
-            
-            # ✅ DIRECT FILE DOWNLOAD ENGINE LAYER: Displays flawlessly right above headers!
             if dl_list:
                 zb_bytes = build_zip_archive(dl_list)
-                st.download_button(f"📥 Download Selected ZIP Archive ({len(dl_list)} Resumes)", zb_bytes, "Resumes.zip", "application/zip", use_container_width=True, type="primary")
-            else:
-                st.info("💡 Pro Tip: Tick the checkbox cell row next to any candidate below to instantly activate your bulk ZIP downloader tool!")
-                
+                st.download_button(f"📥 Download Shortlisted ZIP Bundle ({len(dl_list)} Resumes)", zb_bytes, "Shortlisted_Resumes.zip", "application/zip", use_container_width=True, type="primary")
+            else: st.info("💡 Pro Tip: Tick candidate row checkboxes below to shortlist and download.")
             st.markdown("<br>", unsafe_allow_html=True)
-            h1, h2, h3, h4, h5 = st.columns([1.0, 2.5, 1.5, 1.5, 4.5])
-            with h1: st.write("**Download**")
-            with h2: st.write("**Candidate Name**")
-            with h3: st.write("**Experience**")
-            with h4: st.write("**Exp Weight**")
-            with h5: st.write("**Technologies Found**")
-            st.markdown("<hr style='margin:2px 0; border-top:2px solid #333;'>", unsafe_allow_html=True)
             
-            for c_idx, candidate in enumerate(matched_candidates):
-                r1, r2, r3, r4, r5 = st.columns([1.0, 2.5, 1.5, 1.5, 4.5])
-                with r1: st.checkbox("", key=f"chk_{candidate['ID']}_{st.session_state.reset_counter}")
-                with r2: st.markdown(f"👤 **{candidate['NAME']}**")
-                with r3: st.write(f"{candidate['EXP']} Yrs ({candidate['TIER']})")
-                with r4: st.write(f"🎯 **{candidate['WEIGHT']}**")
-                with r5: st.markdown(candidate['SKILLS_DISP'])
+            c0, c1, c2, c3, c4, c5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
+            c0.write("**Shortlist**")
+            c1.write("**Candidate Name**")
+            c2.write("**Location**")
+            c3.write("**Experience**")
+            c4.write("**Exp Weight**")
+            c5.write("**Technologies Found**")
+            st.markdown("<hr style='margin:2px 0; border-top:2px solid #333;'>", unsafe_allow_html=True)
+            for c in matched_candidates:
+                r0, r1, r2, r3, r4, r5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
+                r0.checkbox("", key=f"chk_{c['ID']}_{st.session_state.reset_counter}")
+                r1.markdown(f"👤 **{c['NAME']}**")
+                r2.write(f"📍 **{c['LOCATION']}**")
+                r3.write(f"{c['EXP']} Yrs ({c['TIER']})")
+                r4.write(f"🎯 **{c['WEIGHT']}**")
+                r5.markdown(c['SKILLS_DISP'])
                 st.markdown("<hr style='margin:2px 0; border-top:1px dashed #ccc;'>", unsafe_allow_html=True)
-        else: st.warning("⚠️ No profiles matching criteria found inside this tier bracket.")
+        else: st.warning("⚠️ No profiles matching criteria found inside this bracket filter.")
     else: st.warning("No candidate records matched your search parameters.")
-else: st.info("👋 Good Afternoon! Select your keyword tags inside the index dropdown list above or select a Role category dropdown on the left sidebar to begin.")
+else: st.info("👋 Select your Target Roles and Location filters on the left sidebar parameter panel to begin shortlisting.")
