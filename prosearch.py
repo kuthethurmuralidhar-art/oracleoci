@@ -58,10 +58,10 @@ with st.sidebar:
     st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
     st.write("**📍 Multi-Location Filter:**")
     selected_locations_filter = st.multiselect("Choose Target Cities:", options=unique_locations, key=f"loc_ms_{st.session_state.reset_counter}")
-    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin:16px 0;'>", unsafe_allow_html=True)
     st.write("**👔 Multi-Role Selection Panel:**")
     active_selected_roles = st.multiselect("Select Target Professional Roles:", options=list(structured_tree.keys()), key=f"roles_ms_{st.session_state.reset_counter}")
-    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin:16px 0;'>", unsafe_allow_html=True)
     st.write("**🛠️ Chained Competency Skills Index:**")
     chained_available_skills = []
     if active_selected_roles:
@@ -117,7 +117,7 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
             master_key = f"master_selected_{st.session_state.reset_counter}"
             all_keys = [f"chk_{cand['ID']}_{st.session_state.reset_counter}" for cand in matched_candidates]
             
-            # ✅ BI-DIRECTIONAL LOGIC PASS: Pre-computes the master checkbox state dynamically from active user row actions
+            # ✅ BI-DIRECTIONAL REALIGNMENT ENGINE: Live-reads user checkboxes directly to toggle the header parameter
             all_checked_by_user = all(st.session_state.get(k, False) for k in all_keys) if all_keys else False
 
             c0, c1, c2, c3, c4, c5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
@@ -143,7 +143,6 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
                 with r0:
                     is_checked = st.checkbox("", key=r_key)
                     
-                # ✅ FIX: Evaluates raw check values direct from active widget states to lock the button onto the canvas!
                 if is_checked:
                     final_dl_list.append(c)
                     
@@ -154,13 +153,14 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
                 with r5: st.markdown(c['SKILLS_DISP'])
                 st.markdown("<hr style='margin:2px 0; border-top:1px dashed #ccc;'>", unsafe_allow_html=True)
                 
-            # Log state tracking parameters for subsequent frame loop cycles
             st.session_state["_last_all"] = select_all
             
-            # ✅ RESTORED DOWNLOAD STRATEGIES: The blue button stays 100% active and responsive under all conditions!
+            # ✅ THE DEFINITIVE ENTRY: The primary blue download button is fully restored with perfect text closing bounds!
             if final_dl_list:
                 st.markdown("<br>", unsafe_allow_html=True)
                 zb_bytes = build_zip_archive(final_dl_list)
                 st.download_button(f"📥 Download Shortlisted ZIP Bundle ({len(final_dl_list)} Resumes)", zb_bytes, "Shortlisted_Resumes.zip", "application/zip", use_container_width=True, type="primary")
             else:
                 st.info("💡 Pro Tip: Tick the 'All' checkbox at the header or choose row cells below to download.")
+        else: st.warning("⚠️ No profiles matching criteria found inside this bracket filter.")
+    else: st.warning("No candidate records matched your search parameters.")
