@@ -1,4 +1,4 @@
-import streamlit as st, pandas as pd, os, io, zipfile, requests
+import streamlit as st, pandas as pd, os, io, zipfile, requests, oracledb
 
 W_DIR = os.path.join(os.getcwd(), "wallet_files")
 
@@ -10,7 +10,6 @@ def get_db_connection():
     }
     def bh(cursor, name, dtype, size, prec, scale):
         if dtype == oracledb.DB_TYPE_BLOB: return cursor.var(bytes, arraysize=cursor.arraysize)
-    import oracledb
     conn = oracledb.connect(**p)
     conn.outputtypehandler = bh
     return conn
@@ -24,21 +23,20 @@ def get_master_taxonomy():
         "ITIL & Infrastructure Engineer": {"📦 DevOps": ["Docker", "Kubernetes", "Git"], "🧱 Legacy": ["Cobol"]}
     }
 
-# ✅ HYBRID MICROSERVICES HOOK: Automatically detects Cloud vs Local Environment environments!
+# ✅ THE FIXED HYBRID MICROSERVICES ENGINE WITH GLOBAL IMPORTS ACTIVE
 def query_matched_profiles_via_stored_function(keyword=None, location=None):
-    # Check if we are running live on the internet inside Streamlit Cloud Containers
+    # Automatically detects if the application is running on your laptop or on Streamlit Cloud
     is_cloud = os.environ.get("STREAMLIT_RUNTIME_ENV") or "mount" in os.getcwd()
     
     if is_cloud:
-        # 🌐 CLOUD DIRECT ROUTE: Bypasses localhost port blocks to communicate with OCI Database natively!
+        # 🌐 GLOBAL CLOUD AUTOMATED PORTAL: Bypasses local ports blocks to connect to OCI natively!
         try:
-            import oracledb
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            # Map keyword list and locations parameter variables safely
-            kw_param = keyword[0] if isinstance(keyword, list) and keyword else (keyword if keyword else None)
-            loc_param = location[0] if isinstance(location, list) and location else (location if location else None)
+            # Sanitize search parameters explicitly for raw type handling passes
+            kw_param = keyword if isinstance(keyword, list) and keyword else (keyword if keyword else None)
+            loc_param = location if isinstance(location, list) and location else (location if location else None)
             
             ref_cursor = cursor.callfunc("GET_MATCHED_CANDIDATES", oracledb.DB_TYPE_CURSOR, [kw_param, loc_param])
             rows = ref_cursor.fetchall()
@@ -62,11 +60,11 @@ def query_matched_profiles_via_stored_function(keyword=None, location=None):
                 df.columns = [c.upper() for c in df.columns]
             return df
         except Exception as cloud_err:
-            st.error(f"Cloud DB Bridge Error: {cloud_err}")
+            st.error(f"Cloud Direct DB Error: {cloud_err}")
             return pd.DataFrame()
             
     else:
-        # 💻 LOCAL REST API ROUTE: Handshakes with your high-speed FastAPI Gateway server on Port 8000
+        # 💻 LOCAL DISCONNECTED ROUTE: Handshakes with your high-speed FastAPI Gateway server on Port 8000
         try:
             api_url = "http://localhost:8000/api/candidates"
             payload_params = {}
