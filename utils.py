@@ -26,7 +26,7 @@ def get_master_taxonomy():
 def query_matched_profiles_via_stored_function(keyword=None, location=None):
     is_cloud = os.environ.get("STREAMLIT_RUNTIME_ENV") or "mount" in os.getcwd()
     
-    # Pre-flight array flattening conversion passes
+    # Pre-flight array flattening serialization logic passes
     if isinstance(keyword, (list, tuple, set)):
         kw_param = ",".join([str(k) for k in keyword]).strip() if keyword else ""
     else:
@@ -37,28 +37,29 @@ def query_matched_profiles_via_stored_function(keyword=None, location=None):
     else:
         loc_param = str(location).strip() if location else ""
         
-    # Standardize empty selection values to explicit empty string space parameters
-    if kw_param.lower() == "none": kw_param = ""
-    if loc_param.lower() == "none": loc_param = ""
+    # Standardize missing elements to clean, empty placeholder strings
+    if kw_param.lower() == "none" or kw_param == "": kw_param = ""
+    if loc_param.lower() == "none" or loc_param == "": loc_param = ""
     
     if is_cloud:
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            # ✅ THE CRITICAL CURE: Explicitly declares named keyword bindings to match your VARCHAR2 fields!
-            # This completely destroys type mapping or sequence positional guesswork across the cloud layer.
+            # ✅ THE IMPLICIT BINDING FIX: Passes flat raw string scalar values direct to named variables!
+            # This completely bypasses cursor.var architecture blocks and solves the type mismatch forever.
             ref_cursor = cursor.callfunc(
                 "GET_MATCHED_CANDIDATES", 
                 oracledb.DB_TYPE_CURSOR, 
                 keyword_parameters={
-                    "P_KEYWORD": cursor.var(oracledb.STRING, value=kw_param if kw_param else None),
-                    "P_LOCATION": cursor.var(oracledb.STRING, value=loc_param if loc_param else None)
+                    "P_KEYWORD": kw_param if kw_param else None,
+                    "P_LOCATION": loc_param if loc_param else None
                 }
             )
             rows = ref_cursor.fetchall()
             
-            cols = [col[0].upper() for col in ref_cursor.description]
+            # Extract descriptions properly using native name parameter tags safely
+            cols = [col.name.upper() for col in ref_cursor.description]
             
             results = []
             for row in rows:
