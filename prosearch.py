@@ -117,7 +117,7 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
             master_key = f"master_selected_{st.session_state.reset_counter}"
             all_keys = [f"chk_{cand['ID']}_{st.session_state.reset_counter}" for cand in matched_candidates]
             
-            # ✅ PRE-FLIGHT CHECK: Sweeps states FIRST. If any box is false, master "All" automatically turns off!
+            # ✅ BI-DIRECTIONAL LOGIC PASS: Pre-computes the master checkbox state dynamically from active user row actions
             all_checked_by_user = all(st.session_state.get(k, False) for k in all_keys) if all_keys else False
 
             c0, c1, c2, c3, c4, c5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
@@ -135,15 +135,16 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
             for c in matched_candidates:
                 r_key = f"chk_{c['ID']}_{st.session_state.reset_counter}"
                 
-                # If the master "All" box was toggled, update row boxes instantly
+                # If master checkbox is changed, force update individual session rows immediately
                 if master_key in st.session_state and st.session_state.get("_last_all") != select_all:
                     st.session_state[r_key] = select_all
                     
                 r0, r1, r2, r3, r4, r5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
                 with r0:
                     is_checked = st.checkbox("", key=r_key)
-                
-                if st.session_state.get(r_key, False):
+                    
+                # ✅ FIX: Evaluates raw check values direct from active widget states to lock the button onto the canvas!
+                if is_checked:
                     final_dl_list.append(c)
                     
                 with r1: st.markdown(f"👤 **{c['NAME']}**")
@@ -153,13 +154,10 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
                 with r5: st.markdown(c['SKILLS_DISP'])
                 st.markdown("<hr style='margin:2px 0; border-top:1px dashed #ccc;'>", unsafe_allow_html=True)
                 
+            # Log state tracking parameters for subsequent frame loop cycles
             st.session_state["_last_all"] = select_all
             
-            # ✅ THE SYNC PATCH: Re-evaluates state changes at loop end and triggers a single smooth redraw if out of bounds
-            still_all_checked = all(st.session_state.get(k, False) for k in all_keys) if all_keys else False
-            if select_all and not still_all_checked:
-                st.rerun()
-            
+            # ✅ RESTORED DOWNLOAD STRATEGIES: The blue button stays 100% active and responsive under all conditions!
             if final_dl_list:
                 st.markdown("<br>", unsafe_allow_html=True)
                 zb_bytes = build_zip_archive(final_dl_list)
