@@ -79,8 +79,10 @@ sidebar_tokens = [s.lower().strip() for s in selected_sidebar_skills]
 active_keywords = list(set(nlp_tokens + sidebar_tokens))
 
 if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
-    kw_arg = active_keywords if active_keywords else None
-    loc_arg = selected_locations_filter if selected_locations_filter else None
+    # ✅ THE STRATEGIC COURIER STRING CURE: Unifies list elements into clean flat CSV values before dispatching HTTP calls!
+    kw_arg = ",".join(active_keywords) if active_keywords else None
+    loc_arg = ",".join(selected_locations_filter) if selected_locations_filter else None
+    
     df_raw = query_matched_profiles_via_stored_function(keyword=kw_arg, location=loc_arg)
     
     if not df_raw.empty:
@@ -90,8 +92,10 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
             raw_str = str(item.get('SKILLS_MATRIX', '')).strip()
             c_exp = float(item.get('EXPERIENCE_YEARS', 0.0))
             c_loc = str(item.get('LOCATION', 'General')).strip().title()
+            
             if selected_locations_filter and c_loc not in selected_locations_filter: continue
             if active_keywords and not any(is_fuzzy_match(kw, raw_str) for kw in active_keywords): continue
+            
             if c_exp < 3.0: tl, exp_wt = "< 3 Yrs", int((c_exp / 3.0) * 100)
             elif 4.0 <= c_exp <= 10.0: tl, exp_wt = "4-10 Yrs", int((c_exp / 10.0) * 100)
             else: tl, exp_wt = "> 10 Yrs", min(int((c_exp / 12.0) * 100), 100)
@@ -99,12 +103,14 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
             if s_tier == "< 3 Yrs (Entry Level)" and tl != "< 3 Yrs": continue
             if s_tier == "4-10 Yrs (Mid-Senior)" and tl != "4-10 Yrs": continue
             if s_tier == "> 10 Yrs (Principal)" and tl != "> 10 Yrs": continue
+            
             disp_skills = raw_str.split("Skills:")[-1].strip() if "Skills:" in raw_str else raw_str
             hl_list = []
             for tag in disp_skills.split(","):
                 st_tag = tag.strip()
                 mf = active_keywords and any(is_fuzzy_match(kw, st_tag) for kw in active_keywords)
                 hl_list.append(f"**:red[{st_tag}]**" if mf else st_tag)
+                
             matched_candidates.append({
                 "ID": str(item.get('ID', '')).strip(), "NAME": str(item.get('NAME', '')).strip(), "EXP": c_exp, "LOCATION": c_loc,
                 "TIER": tl, "WEIGHT": f"{exp_wt}%", "SKILLS_DISP": ", ".join(hl_list), "BLOB": item.get('RESUME_BLOB', None)
