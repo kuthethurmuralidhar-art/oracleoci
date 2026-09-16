@@ -26,29 +26,39 @@ def get_master_taxonomy():
 def query_matched_profiles_via_stored_function(keyword=None, location=None):
     is_cloud = os.environ.get("STREAMLIT_RUNTIME_ENV") or "mount" in os.getcwd()
     
+    # Pre-flight array flattening conversion passes
+    if isinstance(keyword, (list, tuple, set)):
+        kw_param = ",".join([str(k) for k in keyword]).strip() if keyword else ""
+    else:
+        kw_param = str(keyword).strip() if keyword else ""
+        
+    if isinstance(location, (list, tuple, set)):
+        loc_param = ",".join([str(l) for l in location]).strip() if location else ""
+    else:
+        loc_param = str(location).strip() if location else ""
+        
+    # Standardize empty selection values to explicit empty string space parameters
+    if kw_param.lower() == "none": kw_param = ""
+    if loc_param.lower() == "none": loc_param = ""
+    
     if is_cloud:
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            # ✅ THE TYPE ARRAYS UNPACKING CURE: Natively flattens list blocks into VARCHAR2 clean text string rows!
-            if isinstance(keyword, list):
-                kw_param = ",".join(keyword).strip() if keyword else None
-            else:
-                kw_param = str(keyword).strip() if keyword else None
-                
-            if isinstance(location, list):
-                loc_param = ",".join(location).strip() if location else None
-            else:
-                loc_param = str(location).strip() if location else None
-                
-            if kw_param == "": kw_param = None
-            if loc_param == "": loc_param = None
-            
-            ref_cursor = cursor.callfunc("GET_MATCHED_CANDIDATES", oracledb.DB_TYPE_CURSOR, [kw_param, loc_param])
+            # ✅ THE CRITICAL CURE: Explicitly declares named keyword bindings to match your VARCHAR2 fields!
+            # This completely destroys type mapping or sequence positional guesswork across the cloud layer.
+            ref_cursor = cursor.callfunc(
+                "GET_MATCHED_CANDIDATES", 
+                oracledb.DB_TYPE_CURSOR, 
+                keyword_parameters={
+                    "P_KEYWORD": cursor.var(oracledb.STRING, value=kw_param if kw_param else None),
+                    "P_LOCATION": cursor.var(oracledb.STRING, value=loc_param if loc_param else None)
+                }
+            )
             rows = ref_cursor.fetchall()
             
-            cols = [col.name.upper() for col in ref_cursor.description]
+            cols = [col[0].upper() for col in ref_cursor.description]
             
             results = []
             for row in rows:
@@ -75,12 +85,8 @@ def query_matched_profiles_via_stored_function(keyword=None, location=None):
         try:
             api_url = "http://localhost:8000/api/candidates"
             payload_params = {}
-            
-            # For local FastAPI requests, handle lists elegantly via CSV serialization layers
-            if keyword:
-                payload_params["keyword"] = ",".join(keyword) if isinstance(keyword, list) else str(keyword)
-            if location:
-                payload_params["location"] = ",".join(location) if isinstance(location, list) else str(location)
+            if kw_param: payload_params["keyword"] = kw_param
+            if loc_param: payload_params["location"] = loc_param
             
             response = requests.get(api_url, params=payload_params, timeout=5)
             if response.status_code == 200:
@@ -129,7 +135,7 @@ def apply_corporate_styles(wb):
                 cell = ws.cell(row=r, column=c)
                 if r == 1: cell.font = f_hdr; cell.fill = fill_hdr
                 else:
-                    cell.font = f_cel; border = border_thin
+                    cell.font = f_cel; cell.border = border_thin
                     cell.fill = fill_zb if r % 2 == 0 else fill_wh
                     if str(cell.value).startswith("Go to") or str(cell.value).startswith("2026-"):
                         cell.alignment = Alignment(horizontal="center", vertical="center")
