@@ -3,7 +3,6 @@ import streamlit as st, pandas as pd, os, io, zipfile, requests
 W_DIR = os.path.join(os.getcwd(), "wallet_files")
 
 def get_db_connection():
-    # Kept natively intact for background binary BLOB downloads if needed
     p = {
         "user": "ADMIN", "password": st.secrets["db_password"], "dsn": "search_low",
         "config_dir": W_DIR, "wallet_location": W_DIR, "wallet_password": st.secrets["wallet_password"],
@@ -25,31 +24,68 @@ def get_master_taxonomy():
         "ITIL & Infrastructure Engineer": {"📦 DevOps": ["Docker", "Kubernetes", "Git"], "🧱 Legacy": ["Cobol"]}
     }
 
-# ✅ THE DISCONNECTED MICROSERVICES HOOK: Fetches rows from the localhost API instead of connecting to Oracle!
+# ✅ HYBRID MICROSERVICES HOOK: Automatically detects Cloud vs Local Environment environments!
 def query_matched_profiles_via_stored_function(keyword=None, location=None):
-    try:
-        # Calls the high-speed local Web API endpoint gateway you just verified!
-        api_url = "http://localhost:8000/api/candidates"
-        payload_params = {}
-        if keyword: payload_params["keyword"] = keyword
-        if location: payload_params["location"] = location
-        
-        # Execute high-speed HTTP web request loop pass over local Port 8000
-        response = requests.get(api_url, params=payload_params, timeout=5)
-        
-        if response.status_code == 200:
-            json_data = response.json()
-            if json_data.get("status") == "SUCCESS":
-                candidates_list = json_data.get("data", [])
-                # Convert the incoming JSON array stream directly into a clean Pandas DataFrame grid
-                df = pd.DataFrame(candidates_list)
-                if not df.empty:
-                    df.columns = [c.upper() for c in df.columns]
-                return df
-        return pd.DataFrame()
-    except Exception as e:
-        st.error(f"⚠️ Microservice Connection Failure: Ensure api_server.py is running via Uvicorn! Details: {e}")
-        return pd.DataFrame()
+    # Check if we are running live on the internet inside Streamlit Cloud Containers
+    is_cloud = os.environ.get("STREAMLIT_RUNTIME_ENV") or "mount" in os.getcwd()
+    
+    if is_cloud:
+        # 🌐 CLOUD DIRECT ROUTE: Bypasses localhost port blocks to communicate with OCI Database natively!
+        try:
+            import oracledb
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # Map keyword list and locations parameter variables safely
+            kw_param = keyword[0] if isinstance(keyword, list) and keyword else (keyword if keyword else None)
+            loc_param = location[0] if isinstance(location, list) and location else (location if location else None)
+            
+            ref_cursor = cursor.callfunc("GET_MATCHED_CANDIDATES", oracledb.DB_TYPE_CURSOR, [kw_param, loc_param])
+            rows = ref_cursor.fetchall()
+            cols = [col.upper() for col in ref_cursor.description]
+            
+            results = []
+            for row in rows:
+                record = dict(zip(cols, row))
+                if "RESUME_BLOB" in record and record["RESUME_BLOB"] is not None:
+                    record["HAS_BLOB"] = True
+                else:
+                    record["HAS_BLOB"] = False
+                results.append(record)
+                
+            ref_cursor.close()
+            cursor.close()
+            conn.close()
+            
+            df = pd.DataFrame(results)
+            if not df.empty:
+                df.columns = [c.upper() for c in df.columns]
+            return df
+        except Exception as cloud_err:
+            st.error(f"Cloud DB Bridge Error: {cloud_err}")
+            return pd.DataFrame()
+            
+    else:
+        # 💻 LOCAL REST API ROUTE: Handshakes with your high-speed FastAPI Gateway server on Port 8000
+        try:
+            api_url = "http://localhost:8000/api/candidates"
+            payload_params = {}
+            if keyword: payload_params["keyword"] = keyword
+            if location: payload_params["location"] = location
+            
+            response = requests.get(api_url, params=payload_params, timeout=5)
+            if response.status_code == 200:
+                json_data = response.json()
+                if json_data.get("status") == "SUCCESS":
+                    candidates_list = json_data.get("data", [])
+                    df = pd.DataFrame(candidates_list)
+                    if not df.empty:
+                        df.columns = [c.upper() for c in df.columns]
+                    return df
+            return pd.DataFrame()
+        except Exception as local_err:
+            st.error(f"⚠️ Local Microservice Connection Failure: Ensure api_server.py is running via Uvicorn!")
+            return pd.DataFrame()
 
 def build_zip_archive(candidates):
     buf = io.BytesIO()
