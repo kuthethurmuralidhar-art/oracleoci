@@ -23,24 +23,22 @@ def get_master_taxonomy():
         "ITIL & Infrastructure Engineer": {"📦 DevOps": ["Docker", "Kubernetes", "Git"], "🧱 Legacy": ["Cobol"]}
     }
 
-# ✅ THE FIXED HYBRID MICROSERVICES ENGINE WITH GLOBAL IMPORTS ACTIVE
 def query_matched_profiles_via_stored_function(keyword=None, location=None):
-    # Automatically detects if the application is running on your laptop or on Streamlit Cloud
     is_cloud = os.environ.get("STREAMLIT_RUNTIME_ENV") or "mount" in os.getcwd()
     
     if is_cloud:
-        # 🌐 GLOBAL CLOUD AUTOMATED PORTAL: Bypasses local ports blocks to connect to OCI natively!
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            # Sanitize search parameters explicitly for raw type handling passes
             kw_param = keyword if isinstance(keyword, list) and keyword else (keyword if keyword else None)
             loc_param = location if isinstance(location, list) and location else (location if location else None)
             
             ref_cursor = cursor.callfunc("GET_MATCHED_CANDIDATES", oracledb.DB_TYPE_CURSOR, [kw_param, loc_param])
             rows = ref_cursor.fetchall()
-            cols = [col.upper() for col in ref_cursor.description]
+            
+            # ✅ THE FETCHINFO FIX: Safely extracts the column text string name from tuple coordinate 0!
+            cols = [col[0].upper() for col in ref_cursor.description]
             
             results = []
             for row in rows:
@@ -64,7 +62,6 @@ def query_matched_profiles_via_stored_function(keyword=None, location=None):
             return pd.DataFrame()
             
     else:
-        # 💻 LOCAL DISCONNECTED ROUTE: Handshakes with your high-speed FastAPI Gateway server on Port 8000
         try:
             api_url = "http://localhost:8000/api/candidates"
             payload_params = {}
