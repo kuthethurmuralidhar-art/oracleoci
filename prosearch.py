@@ -50,7 +50,6 @@ with st.sidebar:
     if st.button("🧹 Clear All Filters", use_container_width=True):
         st.cache_data.clear()
         st.session_state.reset_counter += 1
-        # Clear out select all states completely on hard reset
         for k in list(st.session_state.keys()):
             if k.startswith("chk_") or "sel_all" in k: del st.session_state[k]
         st.rerun()
@@ -134,17 +133,20 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
         if matched_candidates:
             st.markdown(f"### 🎯 Shortlisting Workspace Matrix ({len(matched_candidates)} Profiles Found)")
             
-            # Setup layout headers
-            c0, c1, c2, c3, c4, c5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
+            # Setup session trackers ahead of UI drawing loop
+            all_keys = [f"chk_{cand['ID']}_{st.session_state.reset_counter}" for cand in matched_candidates]
+            master_key = f"sel_all_{st.session_state.reset_counter}"
             
-            # ✅ MASTER TOGGLE CALLBACK FUNCTION: Re-evaluates states dynamically on change
-            def toggle_all_rows():
-                m_state = st.session_state[f"sel_all_{st.session_state.reset_counter}"]
-                for cand in matched_candidates:
-                    st.session_state[f"chk_{cand['ID']}_{st.session_state.reset_counter}"] = m_state
+            # Pre-calculate what the master checkbox value should be based on row interactions
+            all_checked_by_user = all(st.session_state.get(k, False) for k in all_keys) if all_keys else False
+            if master_key not in st.session_state:
+                st.session_state[master_key] = False
 
+            # Draw the grid table header row cells
+            c0, c1, c2, c3, c4, c5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
             with c0: 
-                select_all = st.checkbox("All", key=f"sel_all_{st.session_state.reset_counter}", on_change=toggle_all_rows)
+                # ✅ SMART TWO-WAY CHECKBOX: Values auto-reflect user click interactions perfectly!
+                select_all = st.checkbox("All", value=all_checked_by_user, key=master_key)
                 
             with c1: st.write("**Candidate Name**")
             with c2: st.write("**Location**")
@@ -155,19 +157,17 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
             
             final_dl_list = []
             
+            # Render individual candidate layout rows cell by cell
             for c in matched_candidates:
                 r0, r1, r2, r3, r4, r5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
-                
-                # Dynamic initialization of checkboxes into the background session tracker
                 row_key = f"chk_{c['ID']}_{st.session_state.reset_counter}"
-                if row_key not in st.session_state:
-                    st.session_state[row_key] = False
-                    
-                # ✅ INTERACTIVE CHECKBOX LAYER: Follows user state modifications completely fluidly!
-                with r0: is_checked = st.checkbox("", key=row_key)
                 
-                if is_checked:
-                    final_dl_list.append(c)
+                # If master checkbox is changed, force update individual session rows immediately
+                if st.headers if master_key in st.session_state and st.session_state.get("_last_all") != select_all:
+                    st.session_state[row_key] = select_all
+                
+                with r0: is_checked = st.checkbox("", key=row_key)
+                if is_checked: final_dl_list.append(c)
                 
                 with r1: st.markdown(f"👤 **{c['NAME']}**")
                 with r2: st.write(f"📍 **{c['LOCATION']}**")
@@ -176,6 +176,4 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
                 with r5: st.markdown(c['SKILLS_DISP'])
                 st.markdown("<hr style='margin:2px 0; border-top:1px dashed #ccc;'>", unsafe_allow_html=True)
                 
-            if final_dl_list:
-                st.markdown("<br>", unsafe_allow_html=True)
-                zb_bytes = build_zip_archive(final_dl_list)
+            # Track state changes for the next redraw cycle
