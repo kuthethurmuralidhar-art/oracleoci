@@ -13,7 +13,6 @@ def on_row_toggle(m_key, r_key):
     if not st.session_state[r_key]:
         st.session_state[m_key] = False
 
-# ✅ THE FIXED HYBRID MATRIX VIEW ENGINE WITH PURE PRE-FLIGHT COMPUTE BALANCING
 def render_candidate_matrix_workspace(active_keywords, selected_locations_filter, s_tier):
     kw_arg = ",".join(active_keywords) if active_keywords else None
     loc_arg = ",".join(selected_locations_filter) if selected_locations_filter else None
@@ -83,7 +82,6 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         st.warning("⚠️ No profiles matching criteria found inside this bracket filter.")
         return
 
-    # Dynamic descending AI ranker sorting loop pass
     matched_candidates = sorted(matched_candidates, key=lambda x: x["SCORE_PCT"], reverse=True)
 
     st.markdown(f"### 🎯 AI Ranking Workspace Matrix ({len(matched_candidates)} Profiles Found)")
@@ -97,23 +95,22 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         
     all_checked_by_user = all(st.session_state.get(k, False) for k in all_keys) if all_keys else False
 
-    c0, c1, c2, c3, c4, c5 = st.columns([0.8, 2.2, 1.2, 1.2, 2.2, 3.0])
-    
-    # ✅ FIX: Flattened directly into function scope so trailing trackers can see it!
+    c0, c1, c2, c3, c4, c5 = st.columns([0.8, 2.2, 1.2, 1.2, 2.0, 3.2])
     with c0: 
         select_all = st.checkbox("All", value=all_checked_by_user, key=master_key, on_change=on_master_toggle, args=(master_key, all_keys))
         
     with c1: st.write("**Candidate Name**")
     with c2: st.write("**Location**")
     with c3: st.write("**Experience**")
-    with c4: st.write("**AI Match Ranking**")
+    # ✅ CLEAN CUSTOM HEADER COLUMN NAME
+    with c4: st.write("**Ranking**")
     with c5: st.write("**Technologies Found**")
     st.markdown("<hr style='margin:2px 0; border-top:2px solid #333;'>", unsafe_allow_html=True)
     
     final_dl_list = []
     for c in matched_candidates:
         r_key = f"chk_{c['ID']}_{st.session_state.reset_counter}"
-        r0, r1, r2, r3, r4, r5 = st.columns([0.8, 2.2, 1.2, 1.2, 2.2, 3.0])
+        r0, r1, r2, r3, r4, r5 = st.columns([0.8, 2.2, 1.2, 1.2, 2.0, 3.2])
         
         with r0: st.checkbox("", key=r_key, on_change=on_row_toggle, args=(master_key, r_key))
         if st.session_state.get(r_key, False): final_dl_list.append(c)
@@ -123,25 +120,29 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         with r3: st.write(f"{c['EXP']} Yrs ({c['TIER']})")
         
         with r4: 
+            # ✅ THE MASTERPIECE MATRIX TRAFFIC-LIGHT BADGES ENGINE: Pure custom corporate color shading!
             if c["SCORE_PCT"] >= 80:
+                # Above 80% --> Emerald Green Branding Card
                 st.markdown(f"""
                     <div style='background-color:#E8F5E9; border:1px solid #2E7D32; border-left:5px solid #2E7D32; 
-                         padding:6px 12px; border-radius:4px; font-weight:bold; color:#1B5E20; text-align:center;'>
-                        🟢 HIGH MATCH ({c['SCORE_PCT']}%)
+                         padding:6px 12px; border-radius:4px; font-weight:bold; color:#1B5E20; text-align:center; font-size:13px;'>
+                        🟢 {c['SCORE_PCT']}%
                     </div>
                 """, unsafe_allow_html=True)
-            elif 50 <= c["SCORE_PCT"] < 80:
+            elif 60 <= c["SCORE_PCT"] < 80:
+                # 60% to 80% --> Bright Amber Orange Branding Card
                 st.markdown(f"""
-                    <div style='background-color:#FFFDE7; border:1px solid #F57F17; border-left:5px solid #F57F17; 
-                         padding:6px 12px; border-radius:4px; font-weight:bold; color:#E65100; text-align:center;'>
-                        🟡 MEDIUM MATCH ({c['SCORE_PCT']}%)
+                    <div style='background-color:#FFF3E0; border:1px solid #EF6C00; border-left:5px solid #EF6C00; 
+                         padding:6px 12px; border-radius:4px; font-weight:bold; color:#E65100; text-align:center; font-size:13px;'>
+                        🟠 {c['SCORE_PCT']}%
                     </div>
                 """, unsafe_allow_html=True)
             else:
+                # Below 60% --> High-Contrast Crimson Red Branding Card
                 st.markdown(f"""
-                    <div style='background-color:#F5F5F5; border:1px solid #616161; border-left:5px solid #616161; 
-                         padding:6px 12px; border-radius:4px; font-weight:bold; color:#212121; text-align:center;'>
-                        ⚪ LOW MATCH ({c['SCORE_PCT']}%)
+                    <div style='background-color:#FFEBEE; border:1px solid #C62828; border-left:5px solid #C62828; 
+                         padding:6px 12px; border-radius:4px; font-weight:bold; color:#B71C1C; text-align:center; font-size:13px;'>
+                        🔴 {c['SCORE_PCT']}%
                     </div>
                 """, unsafe_allow_html=True)
             
