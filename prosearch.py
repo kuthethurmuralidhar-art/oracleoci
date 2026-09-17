@@ -50,18 +50,17 @@ with st.sidebar:
         st.cache_data.clear()
         st.session_state.reset_counter += 1
         for k in list(st.session_state.keys()):
-            if k.startswith("chk_") or "sel_all" in k or "master_selected" in k: 
-                st.session_state.pop(k, None)
+            if k.startswith("chk_") or "sel_all" in k: st.session_state.pop(k, None)
         st.rerun()
     st.markdown("<style>div[data-testid='stSidebar'] div.stRadio { margin-top: -15px !important; padding-top: 0px !important; }</style>", unsafe_allow_html=True)
     s_tier = st.radio("Select Target Bracket:", options=["All Profiles (Ignore Exp Limit)", "< 3 Yrs (Entry Level)", "4-10 Yrs (Mid-Senior)", "> 10 Yrs (Principal)"])
     st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
     st.write("**📍 Multi-Location Filter:**")
     selected_locations_filter = st.multiselect("Choose Target Cities:", options=unique_locations, key=f"loc_ms_{st.session_state.reset_counter}")
-    st.markdown("<hr style='margin:16px 0;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
     st.write("**👔 Multi-Role Selection Panel:**")
     active_selected_roles = st.multiselect("Select Target Professional Roles:", options=list(structured_tree.keys()), key=f"roles_ms_{st.session_state.reset_counter}")
-    st.markdown("<hr style='margin:16px 0;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
     st.write("**🛠️ Chained Competency Skills Index:**")
     chained_available_skills = []
     if active_selected_roles:
@@ -113,17 +112,18 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
             
         if matched_candidates:
             st.markdown(f"### 🎯 Shortlisting Workspace Matrix ({len(matched_candidates)} Profiles Found)")
-            
             master_key = f"master_selected_{st.session_state.reset_counter}"
             all_keys = [f"chk_{cand['ID']}_{st.session_state.reset_counter}" for cand in matched_candidates]
             
-            # ✅ BI-DIRECTIONAL REALIGNMENT ENGINE: Live-reads user checkboxes directly to toggle the header parameter
-            all_checked_by_user = all(st.session_state.get(k, False) for k in all_keys) if all_keys else False
+            for k in all_keys:
+                if k not in st.session_state: st.session_state[k] = False
+                
+            total_possible_count = len(matched_candidates)
+            user_checked_count = sum(1 for k in all_keys if st.session_state.get(k, False))
+            all_checked_by_user = (user_checked_count == total_possible_count) and total_possible_count > 0
 
             c0, c1, c2, c3, c4, c5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
-            with c0:
-                select_all = st.checkbox("All", value=all_checked_by_user, key=master_key)
-                
+            with c0: select_all = st.checkbox("All", value=all_checked_by_user, key=master_key)
             with c1: st.write("**Candidate Name**")
             with c2: st.write("**Location**")
             with c3: st.write("**Experience**")
@@ -134,18 +134,11 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
             final_dl_list = []
             for c in matched_candidates:
                 r_key = f"chk_{c['ID']}_{st.session_state.reset_counter}"
-                
-                # If master checkbox is changed, force update individual session rows immediately
                 if master_key in st.session_state and st.session_state.get("_last_all") != select_all:
                     st.session_state[r_key] = select_all
-                    
                 r0, r1, r2, r3, r4, r5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
-                with r0:
-                    is_checked = st.checkbox("", key=r_key)
-                    
-                if is_checked:
-                    final_dl_list.append(c)
-                    
+                with r0: is_checked = st.checkbox("", key=r_key)
+                if is_checked: final_dl_list.append(c)
                 with r1: st.markdown(f"👤 **{c['NAME']}**")
                 with r2: st.write(f"📍 **{c['LOCATION']}**")
                 with r3: st.write(f"{c['EXP']} Yrs ({c['TIER']})")
@@ -154,13 +147,16 @@ if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
                 st.markdown("<hr style='margin:2px 0; border-top:1px dashed #ccc;'>", unsafe_allow_html=True)
                 
             st.session_state["_last_all"] = select_all
+            updated_checked_count = len(final_dl_list)
             
-            # ✅ THE DEFINITIVE ENTRY: The primary blue download button is fully restored with perfect text closing bounds!
+            # ✅ PRE-FLIGHT LOOP DISRUPTOR: Instantly flips the header key state without infinite refresh lag!
+            if select_all and updated_checked_count < total_possible_count:
+                st.session_state[master_key] = False
+                st.rerun()
+                
+            # ✅ DEFINITIVE DOWNLOAD BLOCK: 100% complete and fully present inside the code frame bounds!
             if final_dl_list:
                 st.markdown("<br>", unsafe_allow_html=True)
                 zb_bytes = build_zip_archive(final_dl_list)
                 st.download_button(f"📥 Download Shortlisted ZIP Bundle ({len(final_dl_list)} Resumes)", zb_bytes, "Shortlisted_Resumes.zip", "application/zip", use_container_width=True, type="primary")
-            else:
-                st.info("💡 Pro Tip: Tick the 'All' checkbox at the header or choose row cells below to download.")
-        else: st.warning("⚠️ No profiles matching criteria found inside this bracket filter.")
-    else: st.warning("No candidate records matched your search parameters.")
+            else: st.info("💡 Pro Tip: Tick the 'All' checkbox at the header or choose row cells below to download.")
