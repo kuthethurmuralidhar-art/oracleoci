@@ -1,7 +1,7 @@
-import streamlit as st
+import streamlit as st, pandas as pd
 from collections import Counter
 from utils import get_db_connection, get_master_taxonomy, init_page_headers
-# ✅ THE CLEAN FACTORIZED IMPORT: Call your standalone layout engine!
+# ✅ FACTORIZED CALL: Imports your standalone layout engine!
 from matrix_view import render_candidate_matrix_workspace
 
 init_page_headers()
@@ -9,6 +9,7 @@ init_page_headers()
 def get_categorized_skills_with_counts():
     try:
         conn = get_db_connection()
+        # ✅ FIXED: pd is now globally active to execute database reads perfectly!
         df = pd.read_sql("SELECT skills_matrix, location FROM skills", conn)
         conn.close()
         if df.empty: return {}, {}, [], 0
@@ -30,7 +31,6 @@ def get_categorized_skills_with_counts():
             for r, td in cats.items():
                 for t, kws in td.items():
                     if any(k.lower() in fs.lower() for k in kws): tree[r][t].append(fs)
-        import pandas as pd
         return tally, tree, sorted(all_locs), len(df)
     except: return {}, {}, [], 0
 
@@ -52,9 +52,16 @@ with st.sidebar:
         for k in list(st.session_state.keys()):
             if k.startswith("chk_") or "sel_all" in k or "master_selected" in k: st.session_state.pop(k, None)
         st.rerun()
+    st.markdown("<style>div[data-testid='stSidebar'] div.stRadio { margin-top: -15px !important; padding-top: 0px !important; }</style>", unsafe_allow_html=True)
     s_tier = st.radio("Select Target Bracket:", options=["All Profiles (Ignore Exp Limit)", "< 3 Yrs (Entry Level)", "4-10 Yrs (Mid-Senior)", "> 10 Yrs (Principal)"])
+    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+    st.write("**📍 Multi-Location Filter:**")
     selected_locations_filter = st.multiselect("Choose Target Cities:", options=unique_locations, key=f"loc_ms_{st.session_state.reset_counter}")
+    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+    st.write("**👔 Multi-Role Selection Panel:**")
     active_selected_roles = st.multiselect("Select Target Professional Roles:", options=list(structured_tree.keys()), key=f"roles_ms_{st.session_state.reset_counter}")
+    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+    st.write("**🛠️ Chained Competency Skills Index:**")
     
     chained_available_skills = []
     if active_selected_roles:
@@ -72,7 +79,7 @@ nlp_tokens = [t.lower().strip() for t in nlp_selection_tags]
 sidebar_tokens = [s.lower().strip() for s in selected_sidebar_skills]
 active_keywords = list(set(nlp_tokens + sidebar_tokens))
 
-# ✅ THE CLEAN MASTER CALL: If filters are active, pass control cleanly to matrix_view!
+# ✅ THE CLEAN MASTER CALL: Pass parameters to your factorized view module!
 if len(active_keywords) > 0 or len(selected_locations_filter) > 0:
     render_candidate_matrix_workspace(active_keywords, selected_locations_filter, s_tier)
 else:
