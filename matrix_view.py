@@ -4,7 +4,6 @@ from utils import query_matched_profiles_via_stored_function, build_zip_archive
 def is_fuzzy_match(kw, target_str):
     return kw.lower().strip() in target_str.lower().strip()
 
-# ✅ THE DECOUPLED MATRIX VIEW RENDERER: Manages columns layout and select states independently!
 def render_candidate_matrix_workspace(active_keywords, selected_locations_filter, s_tier):
     kw_arg = ",".join(active_keywords) if active_keywords else None
     loc_arg = ",".join(selected_locations_filter) if selected_locations_filter else None
@@ -56,7 +55,8 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
     master_key = f"master_selected_{st.session_state.reset_counter}"
     all_keys = [f"chk_{cand['ID']}_{st.session_state.reset_counter}" for cand in matched_candidates]
     
-    # Run pre-flight state checks
+    # ✅ THE COMPUTE CURE: Explicitly declares total_possible_count globally for the check block!
+    total_possible_count = len(matched_candidates)
     all_checked_by_user = all(st.session_state.get(k, False) for k in all_keys) if all_keys else False
 
     c0, c1, c2, c3, c4, c5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
