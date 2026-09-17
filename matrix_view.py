@@ -4,6 +4,7 @@ from utils import query_matched_profiles_via_stored_function, build_zip_archive
 def is_fuzzy_match(kw, target_str):
     return kw.lower().strip() in target_str.lower().strip()
 
+# ✅ THE FIXED HYBRID MATRIX VIEW ENGINE WITH PURE CALLBACK STATE SYNC
 def render_candidate_matrix_workspace(active_keywords, selected_locations_filter, s_tier):
     kw_arg = ",".join(active_keywords) if active_keywords else None
     loc_arg = ",".join(selected_locations_filter) if selected_locations_filter else None
@@ -55,12 +56,24 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
     master_key = f"master_selected_{st.session_state.reset_counter}"
     all_keys = [f"chk_{cand['ID']}_{st.session_state.reset_counter}" for cand in matched_candidates]
     
-    # ✅ THE COMPUTE CURE: Explicitly declares total_possible_count globally for the check block!
-    total_possible_count = len(matched_candidates)
-    all_checked_by_user = all(st.session_state.get(k, False) for k in all_keys) if all_keys else False
+    # Initialize background tracking states cleanly
+    for k in all_keys:
+        if k not in st.session_state: st.session_state[k] = False
+    if master_key not in st.session_state: st.session_state[master_key] = False
+
+    # ✅ CALLBACK 1: Flips every row checkbox to true/false when Master changes
+    def toggle_all_rows():
+        for k in all_keys:
+            st.session_state[k] = st.session_state[master_key]
+
+    # ✅ CALLBACK 2: Safely updates Master box state behind the scenes when any row changes
+    def sync_individual_to_master():
+        all_checked = all(st.session_state.get(k, False) for k in all_keys)
+        st.session_state[master_key] = all_checked
 
     c0, c1, c2, c3, c4, c5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
-    with c0: select_all = st.checkbox("All", value=all_checked_by_user, key=master_key)
+    with c0: 
+        st.checkbox("All", key=master_key, on_change=toggle_all_rows)
     with c1: st.write("**Candidate Name**")
     with c2: st.write("**Location**")
     with c3: st.write("**Experience**")
@@ -71,12 +84,13 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
     final_dl_list = []
     for c in matched_candidates:
         r_key = f"chk_{c['ID']}_{st.session_state.reset_counter}"
-        if master_key in st.session_state and st.session_state.get("_last_all") != select_all:
-            st.session_state[r_key] = select_all
-            
         r0, r1, r2, r3, r4, r5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
-        with r0: is_checked = st.checkbox("", key=r_key)
-        if is_checked: final_dl_list.append(c)
+        
+        with r0: 
+            # ✅ SAFE INTERACTIVE HANDSHAKE: Executes callback securely on click without crashes
+            is_checked = st.checkbox("", key=r_key, on_change=sync_individual_to_master)
+        if is_checked: 
+            final_dl_list.append(c)
             
         with r1: st.markdown(f"👤 **{c['NAME']}**")
         with r2: st.write(f"📍 **{c['LOCATION']}**")
@@ -84,13 +98,6 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         with r4: st.write(f"🎯 **{c['WEIGHT']}**")
         with r5: st.markdown(c['SKILLS_DISP'])
         st.markdown("<hr style='margin:2px 0; border-top:1px dashed #ccc;'>", unsafe_allow_html=True)
-        
-    st.session_state["_last_all"] = select_all
-    updated_checked_count = len(final_dl_list)
-    
-    if select_all and updated_checked_count < total_possible_count:
-        st.session_state[master_key] = False
-        st.rerun()
         
     if final_dl_list:
         st.markdown("<br>", unsafe_allow_html=True)
