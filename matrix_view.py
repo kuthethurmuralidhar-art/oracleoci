@@ -13,6 +13,7 @@ def on_row_toggle(m_key, r_key):
     if not st.session_state[r_key]:
         st.session_state[m_key] = False
 
+# ✅ THE FIXED HYBRID MATRIX VIEW ENGINE WITH PURE PRE-FLIGHT COMPUTE BALANCING
 def render_candidate_matrix_workspace(active_keywords, selected_locations_filter, s_tier):
     kw_arg = ",".join(active_keywords) if active_keywords else None
     loc_arg = ",".join(selected_locations_filter) if selected_locations_filter else None
@@ -38,7 +39,7 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         elif 4.0 <= c_exp <= 10.0: tl = "4-10 Yrs"
         else: tl = "> 10 Yrs"
 
-        # --- AI ALCORITHMIC MATH POOL SCORING ---
+        # --- AI ALGORITHMIC MATH POOL SCORING ---
         if active_keywords:
             skills_split = [s.strip().lower() for s in (raw_str.split("Skills:")[-1] if "Skills:" in raw_str else raw_str).split(",")]
             matches = sum(1 for kw in active_keywords if any(kw in s for s in skills_split))
@@ -96,9 +97,12 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         
     all_checked_by_user = all(st.session_state.get(k, False) for k in all_keys) if all_keys else False
 
-    # Layout dimensions optimized for wide high-contrast visibility metrics
     c0, c1, c2, c3, c4, c5 = st.columns([0.8, 2.2, 1.2, 1.2, 2.2, 3.0])
-    with c0: st.checkbox("All", value=all_checked_by_user, key=master_key, on_change=on_master_toggle, args=(master_key, all_keys))
+    
+    # ✅ FIX: Flattened directly into function scope so trailing trackers can see it!
+    with c0: 
+        select_all = st.checkbox("All", value=all_checked_by_user, key=master_key, on_change=on_master_toggle, args=(master_key, all_keys))
+        
     with c1: st.write("**Candidate Name**")
     with c2: st.write("**Location**")
     with c3: st.write("**Experience**")
@@ -119,7 +123,6 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         with r3: st.write(f"{c['EXP']} Yrs ({c['TIER']})")
         
         with r4: 
-            # ✅ THE CUSTOM VISUAL BADGE ENGINE: Injects high-contrast inline CSS blocks for structural layout change!
             if c["SCORE_PCT"] >= 80:
                 st.markdown(f"""
                     <div style='background-color:#E8F5E9; border:1px solid #2E7D32; border-left:5px solid #2E7D32; 
