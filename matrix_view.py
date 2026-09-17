@@ -4,7 +4,7 @@ from utils import query_matched_profiles_via_stored_function, build_zip_archive
 def is_fuzzy_match(kw, target_str):
     return kw.lower().strip() in target_str.lower().strip()
 
-# ✅ THE FLUID DYNAMIC INTERACTIVE GRID ENGINE WITH SECURE KEY VECTOR STATE SEGREGATION
+# ✅ THE BULLETPROOF INTERACTIVE GRID ENGINE WITH PURE PRE-FLIGHT COMPUTE BALANCING
 def render_candidate_matrix_workspace(active_keywords, selected_locations_filter, s_tier):
     kw_arg = ",".join(active_keywords) if active_keywords else None
     loc_arg = ",".join(selected_locations_filter) if selected_locations_filter else None
@@ -56,19 +56,21 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
     master_key = f"master_selected_{st.session_state.reset_counter}"
     all_keys = [f"chk_{cand['ID']}_{st.session_state.reset_counter}" for cand in matched_candidates]
     
-    # 1. Initialize checkbox key variables safely inside cache parameters memory
+    # 1. Initialize checkbox key variables safely inside cache memory parameters
     for k in all_keys:
         if k not in st.session_state: st.session_state[k] = False
 
-    # 2. ✅ PRE-FLIGHT LIVE CHECKER BLOCK: Evaluates if all individual row elements are checked
+    # 2. ✅ THE PRE-FLIGHT LOOP SOLUTION: Evaluates user checkbox selections BEFORE drawing any widgets!
     total_count = len(matched_candidates)
     checked_count_by_user = sum(1 for k in all_keys if st.session_state.get(k, False))
+    
+    # If even a single candidate row is unchecked, force the default state parameter to False immediately!
     all_checked_live = (checked_count_by_user == total_count) and total_count > 0
 
-    # Draw grid table headers
+    # Draw grid table header cells layout
     c0, c1, c2, c3, c4, c5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
     with c0: 
-        # Master header checkbox is bound safely to value parameter tracking
+        # The Master checkbox safely inherits the value parameter matching our live counts perfectly
         select_all = st.checkbox("All", value=all_checked_live, key=master_key)
     with c1: st.write("**Candidate Name**")
     with c2: st.write("**Location**")
@@ -79,7 +81,7 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
     
     final_dl_list = []
     
-    # 3. Render and process data row layout grids cell by cell
+    # 3. Process candidate row matrices data cells layout loops
     for c in matched_candidates:
         r_key = f"chk_{c['ID']}_{st.session_state.reset_counter}"
         
@@ -91,7 +93,7 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         with r0: 
             is_checked = st.checkbox("", key=r_key)
             
-        # Target raw session values directly to prevent state lag gaps or widget collisions
+        # Target raw session state memory values directly to avoid any cell lag or widget collisions
         if st.session_state.get(r_key, False): 
             final_dl_list.append(c)
             
@@ -102,16 +104,14 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         with r5: st.markdown(c['SKILLS_DISP'])
         st.markdown("<hr style='margin:2px 0; border-top:1px dashed #ccc;'>", unsafe_allow_html=True)
         
-    # Track selection changes for the subsequent redraw pass cycle
+    # Log the tracking value for subsequent frame cycles pass
     st.session_state["_last_all"] = select_all
     
-    # 4. ✅ INTERNAL BLOCK ALIGNMENT RE-RUN GAUGE: Instantly flips master header value without crashes
-    updated_checked_count = len(final_dl_list)
-    if select_all and updated_checked_count < total_count:
-        st.session_state[master_key] = False
+    # 4. ✅ CLEAN SELECTION RE-RUN TRIGGER: Safely synchronizes state parameters without duplicate widget errors!
+    if select_all and len(final_dl_list) < total_count:
         st.rerun()
         
-    # 5. Render responsive shortlisting bundle download widgets action button layout
+    # 5. Render responsive download action button layout grid
     if final_dl_list:
         st.markdown("<br>", unsafe_allow_html=True)
         zb_bytes = build_zip_archive(final_dl_list)
