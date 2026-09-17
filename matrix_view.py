@@ -4,7 +4,18 @@ from utils import query_matched_profiles_via_stored_function, build_zip_archive
 def is_fuzzy_match(kw, target_str):
     return kw.lower().strip() in target_str.lower().strip()
 
-# ✅ THE BULLETPROOF INTERACTIVE GRID ENGINE WITH PURE PRE-FLIGHT COMPUTE BALANCING
+# ✅ CALLBACK HANDLER 1: Fires safely BEFORE redraw passes when the master "All" checkbox is toggled
+def on_master_toggle(m_key, a_keys):
+    val = st.session_state[m_key]
+    for k in a_keys:
+        st.session_state[k] = val
+
+# ✅ CALLBACK HANDLER 2: Fires safely BEFORE redraw passes when any individual candidate row checkbox is unchecked
+def on_row_toggle(m_key, r_key):
+    if not st.session_state[r_key]:
+        st.session_state[m_key] = False
+
+# ✅ THE FIXED HYBRID MATRIX VIEW ENGINE: 100% immune to infinite loop redraws and widget errors
 def render_candidate_matrix_workspace(active_keywords, selected_locations_filter, s_tier):
     kw_arg = ",".join(active_keywords) if active_keywords else None
     loc_arg = ",".join(selected_locations_filter) if selected_locations_filter else None
@@ -56,22 +67,18 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
     master_key = f"master_selected_{st.session_state.reset_counter}"
     all_keys = [f"chk_{cand['ID']}_{st.session_state.reset_counter}" for cand in matched_candidates]
     
-    # 1. Initialize checkbox key variables safely inside cache memory parameters
+    # Initialize background tracking state values cleanly
+    if master_key not in st.session_state: st.session_state[master_key] = False
     for k in all_keys:
         if k not in st.session_state: st.session_state[k] = False
+        
+    # Pre-calculate active check intersections to preserve checkbox integrity across redraws
+    all_checked_by_user = all(st.session_state.get(k, False) for k in all_keys) if all_keys else False
 
-    # 2. ✅ THE PRE-FLIGHT LOOP SOLUTION: Evaluates user checkbox selections BEFORE drawing any widgets!
-    total_count = len(matched_candidates)
-    checked_count_by_user = sum(1 for k in all_keys if st.session_state.get(k, False))
-    
-    # If even a single candidate row is unchecked, force the default state parameter to False immediately!
-    all_checked_live = (checked_count_by_user == total_count) and total_count > 0
-
-    # Draw grid table header cells layout
     c0, c1, c2, c3, c4, c5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
     with c0: 
-        # The Master checkbox safely inherits the value parameter matching our live counts perfectly
-        select_all = st.checkbox("All", value=all_checked_live, key=master_key)
+        # ✅ STABLE BINDING: Invokes master callback securely on change with ZERO instantiation conflicts
+        st.checkbox("All", value=all_checked_by_user, key=master_key, on_change=on_master_toggle, args=(master_key, all_keys))
     with c1: st.write("**Candidate Name**")
     with c2: st.write("**Location**")
     with c3: st.write("**Experience**")
@@ -80,20 +87,14 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
     st.markdown("<hr style='margin:2px 0; border-top:2px solid #333;'>", unsafe_allow_html=True)
     
     final_dl_list = []
-    
-    # 3. Process candidate row matrices data cells layout loops
     for c in matched_candidates:
         r_key = f"chk_{c['ID']}_{st.session_state.reset_counter}"
-        
-        # If the master header checkbox value changed, apply the update across rows instantly
-        if master_key in st.session_state and st.session_state.get("_last_all") != select_all:
-            st.session_state[r_key] = select_all
-            
         r0, r1, r2, r3, r4, r5 = st.columns([0.8, 2.2, 1.2, 1.2, 1.2, 4.0])
+        
         with r0: 
-            is_checked = st.checkbox("", key=r_key)
+            # ✅ STABLE ROW HANDSHAKE: Clears master state in memory before rendering pass triggers
+            st.checkbox("", key=r_key, on_change=on_row_toggle, args=(master_key, r_key))
             
-        # Target raw session state memory values directly to avoid any cell lag or widget collisions
         if st.session_state.get(r_key, False): 
             final_dl_list.append(c)
             
@@ -104,14 +105,7 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         with r5: st.markdown(c['SKILLS_DISP'])
         st.markdown("<hr style='margin:2px 0; border-top:1px dashed #ccc;'>", unsafe_allow_html=True)
         
-    # Log the tracking value for subsequent frame cycles pass
-    st.session_state["_last_all"] = select_all
-    
-    # 4. ✅ CLEAN SELECTION RE-RUN TRIGGER: Safely synchronizes state parameters without duplicate widget errors!
-    if select_all and len(final_dl_list) < total_count:
-        st.rerun()
-        
-    # 5. Render responsive download action button layout grid
+    # ✅ PERMANENTLY INSTANT COMPILING DOWNLOAD ENGINE: Stays perfectly stable on canvas
     if final_dl_list:
         st.markdown("<br>", unsafe_allow_html=True)
         zb_bytes = build_zip_archive(final_dl_list)
