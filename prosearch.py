@@ -52,10 +52,10 @@ with st.sidebar:
         st.rerun()
     st.markdown("<style>div[data-testid='stSidebar'] div.stRadio { margin-top: -15px !important; padding-top: 0px !important; }</style>", unsafe_allow_html=True)
     
-    # ✅ THE STRATEGIC REFACTOR: Removed 'All Profiles' option, default is now strictly set to Entry Level!
+    # ✅ THE REVISED RADIO OPTIONS BRACKETS: Clean mathematical segregation strings
     s_tier = st.radio(
         "Select Target Bracket:", 
-        options=["< 3 Yrs (Entry Level)", "4-10 Yrs (Mid-Senior)", "> 10 Yrs (Principal)"],
+        options=["< 3 Yrs (Entry Level)", "3-10 Yrs (Mid-Senior)", ">= 10 Yrs (Principal)"],
         index=0
     )
     
