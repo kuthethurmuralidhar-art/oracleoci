@@ -13,11 +13,20 @@ def on_row_toggle(m_key, r_key):
     if not st.session_state[r_key]:
         st.session_state[m_key] = False
 
+# ✅ THE FIXED HYBRID MATRIX VIEW ENGINE WITH MULTISELECT ARRAY-AWARE LOGIC
 def render_candidate_matrix_workspace(active_keywords, selected_locations_filter, s_tier):
+    # Fallback/Default professional category string mapping configuration
     chosen_role = "Database Administrator (DBA)"
+    
+    # Trace dynamic multiselect state vectors cleanly inside cache parameters memory
     for k in st.session_state.keys():
         if k.startswith("roles_ms_") and st.session_state[k]:
-            chosen_role = st.session_state[k]
+            role_list = st.session_state[k]
+            # ✅ THE CURE: Isolate the first string element safely from the multiselect array bucket!
+            if isinstance(role_list, list) and len(role_list) > 0:
+                chosen_role = role_list[0]
+            elif isinstance(role_list, str):
+                chosen_role = role_list
             break
 
     kw_arg = ",".join(active_keywords) if active_keywords else None
@@ -33,6 +42,7 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
     raw_records = df_raw.to_dict(orient="records")
     taxonomy_tree = get_master_taxonomy()
     
+    # Establish dynamic allowed taxonomy bonus check tokens safely matching corporate metadata paths
     role_allowed_bonus_tokens = ["sql", "performance tuning"]
     if chosen_role in taxonomy_tree:
         for bucket in taxonomy_tree[chosen_role].values():
@@ -51,15 +61,15 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         # 🛡️ HARD BRACKET BOUNDARY EXCLUSION FILTERS (NO MORE LEAKING DATA!)
         # ======================================================================
         if s_tier == "< 3 Yrs (Entry Level)":
-            if c_exp >= 3.0: continue # Completely drop if 3 years or over!
+            if c_exp >= 3.0: continue 
             tl, sx_score = "< 3 Yrs", max(20.0 - (abs(1.5 - c_exp) * 10.0), 0.0)
             
         elif s_tier == "3-10 Yrs (Mid-Senior)":
-            if c_exp < 3.0 or c_exp >= 10.0: continue # Completely drop out of range!
+            if c_exp < 3.0 or c_exp >= 10.0: continue 
             tl, sx_score = "3-10 Yrs", max(20.0 - (abs(6.5 - c_exp) * 2.5), 0.0)
             
         elif s_tier == ">= 10 Yrs (Principal)":
-            if c_exp < 10.0: continue # Completely drop junior profiles!
+            if c_exp < 10.0: continue 
             tl, sx_score = ">= 10 Yrs", min(max((c_exp - 10.0) * 4.0, 0.0), 20.0)
             
         else:
