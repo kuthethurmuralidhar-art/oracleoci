@@ -1,5 +1,5 @@
 import streamlit as st
-from utils import query_matched_profiles_via_stored_function, build_zip_archive
+from utils import query_matched_profiles_via_stored_function, build_zip_archive, get_master_taxonomy
 
 def is_fuzzy_match(kw, target_str):
     return kw.lower().strip() in target_str.lower().strip()
@@ -14,6 +14,12 @@ def on_row_toggle(m_key, r_key):
         st.session_state[m_key] = False
 
 def render_candidate_matrix_workspace(active_keywords, selected_locations_filter, s_tier):
+    chosen_role = "Database Administrator (DBA)"
+    for k in st.session_state.keys():
+        if k.startswith("roles_ms_") and st.session_state[k]:
+            chosen_role = st.session_state[k]
+            break
+
     kw_arg = ",".join(active_keywords) if active_keywords else None
     loc_arg = ",".join(selected_locations_filter) if selected_locations_filter else None
     
@@ -25,7 +31,14 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
 
     matched_candidates = []
     raw_records = df_raw.to_dict(orient="records")
+    taxonomy_tree = get_master_taxonomy()
     
+    role_allowed_bonus_tokens = ["sql", "performance tuning"]
+    if chosen_role in taxonomy_tree:
+        for bucket in taxonomy_tree[chosen_role].values():
+            for skill in bucket:
+                role_allowed_bonus_tokens.append(skill.lower().strip())
+
     for item in raw_records:
         raw_str = str(item.get('SKILLS_MATRIX', '')).strip()
         c_exp = float(item.get('EXPERIENCE_YEARS', 0.0))
@@ -34,11 +47,25 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         if selected_locations_filter and c_loc not in selected_locations_filter: continue
         if active_keywords and not any(is_fuzzy_match(kw, raw_str) for kw in active_keywords): continue
         
-        if c_exp < 3.0: tl = "< 3 Yrs"
-        elif 4.0 <= c_exp <= 10.0: tl = "4-10 Yrs"
-        else: tl = "> 10 Yrs"
+        # ======================================================================
+        # 🛡️ HARD BRACKET BOUNDARY EXCLUSION FILTERS (NO MORE LEAKING DATA!)
+        # ======================================================================
+        if s_tier == "< 3 Yrs (Entry Level)":
+            if c_exp >= 3.0: continue # Completely drop if 3 years or over!
+            tl, sx_score = "< 3 Yrs", max(20.0 - (abs(1.5 - c_exp) * 10.0), 0.0)
+            
+        elif s_tier == "3-10 Yrs (Mid-Senior)":
+            if c_exp < 3.0 or c_exp >= 10.0: continue # Completely drop out of range!
+            tl, sx_score = "3-10 Yrs", max(20.0 - (abs(6.5 - c_exp) * 2.5), 0.0)
+            
+        elif s_tier == ">= 10 Yrs (Principal)":
+            if c_exp < 10.0: continue # Completely drop junior profiles!
+            tl, sx_score = ">= 10 Yrs", min(max((c_exp - 10.0) * 4.0, 0.0), 20.0)
+            
+        else:
+            tl, sx_score = "General", min(c_exp * 2.0, 20.0)
 
-        # --- AI ALGORITHMIC MATH POOL SCORING ---
+        # --- Pillar 1: Keyword Density Match (Te) ---
         if active_keywords:
             skills_split = [s.strip().lower() for s in (raw_str.split("Skills:")[-1] if "Skills:" in raw_str else raw_str).split(",")]
             matches = sum(1 for kw in active_keywords if any(kw in s for s in skills_split))
@@ -46,22 +73,14 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         else:
             te_score = 0.0
 
-        if s_tier == "< 3 Yrs (Entry Level)":
-            sx_score = max(20.0 - (abs(2.0 - c_exp) * 10.0), 0.0)
-        elif s_tier == "4-10 Yrs (Mid-Senior)":
-            sx_score = max(20.0 - (abs(7.0 - c_exp) * 3.0), 0.0)
-        elif s_tier == "> 10 Yrs (Principal)":
-            sx_score = min(max((c_exp - 10.0) * 4.0, 0.0), 20.0)
-        else:
-            sx_score = min(c_exp * 2.0, 20.0)
-
+        # --- Pillar 3: Dynamic Taxonomy Role Proximity Bonus (Wp) ---
         wp_score = 0.0
         if te_score > 0.0:
             all_raw_lower = raw_str.lower()
-            bonus_tokens = ["sql", "performance tuning", "modelling", "linux", "docker", "kubernetes", "python", "aws", "azure"]
-            extra_matches = sum(1 for tok in bonus_tokens if tok in all_raw_lower and not any(kw in tok for kw in active_keywords))
-            wp_score = min(extra_matches * 5.0, 20.0)
+            extra_matches = sum(1 for tok in role_allowed_bonus_tokens if tok in all_raw_lower and not any(kw in tok for kw in active_keywords))
+            wp_score = min(extra_matches * 10.0, 20.0)
 
+        # --- Pillar 4: Multi-Location Precision Alignment (La) ---
         la_score = 10.0 if not selected_locations_filter or c_loc in selected_locations_filter else 5.0
 
         final_aggregate_score = int(te_score + sx_score + wp_score + la_score)
@@ -79,7 +98,7 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         })
         
     if not matched_candidates:
-        st.warning("⚠️ No profiles matching criteria found inside this bracket filter.")
+        st.warning("⚠️ No profiles matching the strict criteria found inside this bracket filter.")
         return
 
     matched_candidates = sorted(matched_candidates, key=lambda x: x["SCORE_PCT"], reverse=True)
@@ -102,7 +121,6 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
     with c1: st.write("**Candidate Name**")
     with c2: st.write("**Location**")
     with c3: st.write("**Experience**")
-    # ✅ CLEAN CUSTOM HEADER COLUMN NAME
     with c4: st.write("**Ranking**")
     with c5: st.write("**Technologies Found**")
     st.markdown("<hr style='margin:2px 0; border-top:2px solid #333;'>", unsafe_allow_html=True)
@@ -120,31 +138,12 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         with r3: st.write(f"{c['EXP']} Yrs ({c['TIER']})")
         
         with r4: 
-            # ✅ THE MASTERPIECE MATRIX TRAFFIC-LIGHT BADGES ENGINE: Pure custom corporate color shading!
             if c["SCORE_PCT"] >= 80:
-                # Above 80% --> Emerald Green Branding Card
-                st.markdown(f"""
-                    <div style='background-color:#E8F5E9; border:1px solid #2E7D32; border-left:5px solid #2E7D32; 
-                         padding:6px 12px; border-radius:4px; font-weight:bold; color:#1B5E20; text-align:center; font-size:13px;'>
-                        🟢 {c['SCORE_PCT']}%
-                    </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f"<div style='background-color:#E8F5E9; border:1px solid #2E7D32; border-left:5px solid #2E7D32; padding:6px 12px; border-radius:4px; font-weight:bold; color:#1B5E20; text-align:center; font-size:13px;'>🟢 {c['SCORE_PCT']}%</div>", unsafe_allow_html=True)
             elif 60 <= c["SCORE_PCT"] < 80:
-                # 60% to 80% --> Bright Amber Orange Branding Card
-                st.markdown(f"""
-                    <div style='background-color:#FFF3E0; border:1px solid #EF6C00; border-left:5px solid #EF6C00; 
-                         padding:6px 12px; border-radius:4px; font-weight:bold; color:#E65100; text-align:center; font-size:13px;'>
-                        🟠 {c['SCORE_PCT']}%
-                    </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f"<div style='background-color:#FFF3E0; border:1px solid #EF6C00; border-left:5px solid #EF6C00; padding:6px 12px; border-radius:4px; font-weight:bold; color:#E65100; text-align:center; font-size:13px;'>🟠 {c['SCORE_PCT']}%</div>", unsafe_allow_html=True)
             else:
-                # Below 60% --> High-Contrast Crimson Red Branding Card
-                st.markdown(f"""
-                    <div style='background-color:#FFEBEE; border:1px solid #C62828; border-left:5px solid #C62828; 
-                         padding:6px 12px; border-radius:4px; font-weight:bold; color:#B71C1C; text-align:center; font-size:13px;'>
-                        🔴 {c['SCORE_PCT']}%
-                    </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f"<div style='background-color:#FFEBEE; border:1px solid #C62828; border-left:5px solid #C62828; padding:6px 12px; border-radius:4px; font-weight:bold; color:#B71C1C; text-align:center; font-size:13px;'>🔴 {c['SCORE_PCT']}%</div>", unsafe_allow_html=True)
             
         with r5: st.markdown(c['SKILLS_DISP'])
         st.markdown("<hr style='margin:2px 0; border-top:1px dashed #ccc;'>", unsafe_allow_html=True)
