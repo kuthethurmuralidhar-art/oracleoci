@@ -20,7 +20,7 @@ def get_categorized_skills_with_counts():
         for rm in df['SKILLS_MATRIX'].astype(str).dropna():
             sp = rm.split("Skills:")[-1] if "Skills:" in rm else rm
             for it in sp.split(","):
-                cl = it.strip().lower()selec
+                cl = it.strip().lower()
                 if cl: all_s.append(n_map.get(cl, it.strip().title()))
         tally = Counter(all_s)
         cats = get_master_taxonomy()
@@ -62,19 +62,8 @@ with st.sidebar:
     st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
     st.write("**📍 Multi-Location Filter:**")
     selected_locations_filter = st.multiselect("Choose Target Cities:", options=unique_locations, key=f"loc_ms_{st.session_state.reset_counter}")
-    # st.write("**👔 Multi-Role Selection Panel:**")
-    # active_selected_roles = st.multiselect("Select Target Professional Roles:", options=list(structured_tree.keys()), key=f"roles_ms_{st.session_state.reset_counter}")
-    st.write("**👔 Target Professional Role Selection:**")
-    # ✅ THE SINGLE-SELECT REFIT: Changed to selectbox and automatically list-wrapped choices to feed downstream filters!
-    chosen_single_role = st.selectbox(
-        "Choose Target Professional Role:", 
-        options=[""] + list(structured_tree.keys()), 
-        index=0, 
-        key=f"roles_sb_{st.session_state.reset_counter}"
-    )
-    # List-wrap the single selection variable so that your existing chained skills loop runs perfectly without any other edits!
-    active_selected_roles = [chosen_single_role] if chosen_single_role else []
-
+    st.write("**👔 Multi-Role Selection Panel:**")
+    active_selected_roles = st.multiselect("Select Target Professional Roles:", options=list(structured_tree.keys()), key=f"roles_ms_{st.session_state.reset_counter}")
     st.write("**🛠️ Chained Competency Skills Index:**")
     
     chained_available_skills = []
