@@ -1,5 +1,6 @@
 import streamlit as st
-import requests
+import requests, os
+from utils import query_matched_profiles_via_stored_function, build_zip_archive, get_master_taxonomy
 
 def is_fuzzy_match(kw, target_str):
     return kw.lower().strip() in target_str.lower().strip()
@@ -13,13 +14,14 @@ def on_row_toggle(m_key, r_key):
     if not st.session_state[r_key]:
         st.session_state[m_key] = False
 
+# ✅ THE FIXED HYBRID MATRIX VIEW ENGINE WITH ZERO-NAME DOWNLOAD STREAMING
 def render_candidate_matrix_workspace(active_keywords, selected_locations_filter, s_tier):
     chosen_role = "Database Administrator (DBA)"
     for k in st.session_state.keys():
         if k.startswith("roles_ms_") and st.session_state[k]:
             role_list = st.session_state[k]
             if isinstance(role_list, list) and len(role_list) > 0:
-                chosen_role = role_list
+                chosen_role = role_list[0]
             elif isinstance(role_list, str):
                 chosen_role = role_list
             break
@@ -51,6 +53,7 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         if selected_locations_filter and c_loc not in selected_locations_filter: continue
         if active_keywords and not any(is_fuzzy_match(kw, raw_str) for kw in active_keywords): continue
         
+        # Enforce strict hard-bracket boundaries
         if s_tier == "< 3 Yrs (Entry Level)":
             if c_exp >= 3.0: continue 
             tl, sx_score = "< 3 Yrs", max(20.0 - (abs(1.5 - c_exp) * 10.0), 0.0)
@@ -126,7 +129,6 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         
         with r0: st.checkbox("", key=r_key, on_change=on_row_toggle, args=(master_key, r_key))
         if st.session_state.get(r_key, False): 
-            # ✅ DECOUPLED KEY PASS: Gather only primary row IDs strings instead of caching heavy file streams
             final_selected_ids.append(c["ID"])
             
         with r1: st.markdown(f"👤 **{c['NAME']}**")
@@ -146,15 +148,19 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         
     st.session_state["_last_all"] = select_all
     
-    # ✅ REST RESTORATION ACTION DOWNLOADER: Invokes FastAPI high-speed binary byte stream channels direct from Port 8000!
+    # ✅ THE COMPLEMENTARY ZERO-NAME CLOUD ROUTER: Reads target domains dynamically from your platform vault memory keys!
     if final_selected_ids:
         st.markdown("<br>", unsafe_allow_html=True)
-        # Construct dynamic string arguments payload
         param_ids_string = ",".join(final_selected_ids)
-        api_stream_url = f"http://localhost:8000/api/download/zip?ids={param_ids_string}"
+        
+        api_gateway_env = os.environ.get("API_GATEWAY_URL")
+        if api_gateway_env:
+            base_url = api_gateway_env.strip().rstrip("/")
+            api_stream_url = f"{base_url}/api/download/zip?ids={param_ids_string}"
+        else:
+            api_stream_url = f"http://localhost:8000/api/download/zip?ids={param_ids_string}"
         
         try:
-            # Hit the backend gateway directly across network port pipes to download raw byte streams in 1-click
             response = requests.get(api_stream_url, stream=True, timeout=10)
             if response.status_code == 200:
                 st.download_button(
@@ -166,11 +172,8 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
                     type="primary"
                 )
             else:
-                st.error("❌ Gateway Transmission Interruption: Server reported a non-200 state context branch.")
+                st.error("❌ Gateway Transmission Interruption: Cloud server reported a non-200 connection state.")
         except Exception as api_err:
-            st.error(f"⚠️ FastAPI Connection Refused: Verify api_server.py is running via Uvicorn! Error: {api_err}")
+            st.error(f"⚠️ Cloud API Connection Refused: Verify server container state parameters! Error: {api_err}")
     else:
         st.info("💡 Pro Tip: Tick the 'All' checkbox at the header or choose row cells below to download.")
-
-# Keep connection dependencies matching the master workspace schemas natively
-from utils import get_master_taxonomy, query_matched_profiles_via_stored_function
