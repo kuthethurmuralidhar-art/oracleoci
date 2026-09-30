@@ -94,10 +94,18 @@ def query_matched_profiles_via_stored_function(keyword=None, location=None):
             return df
         except Exception as cloud_err:
             st.error(f"Cloud Direct DB Error: {cloud_err}"); return pd.DataFrame()
+             # The rest of your utils.py remains completely identical and untouched above line 65...
     else:
         try:
-            #api_url = "http://localhost:8000/api/candidates"
-            api_url = "https://onrender.com"
+            # ✅ THE ZERO-NAME DYNAMIC CURE: Automatically reads your server's link from environment variables!
+            api_gateway_env = os.environ.get("API_GATEWAY_URL")
+            if api_gateway_env:
+                base_url = api_gateway_env.strip().rstrip("/")
+                api_url = f"{base_url}/api/candidates"
+            else:
+                # Fallback to local port mapping configuration if running on your desktop
+                api_url = "http://localhost:8000/api/candidates"
+                
             payload_params = {}
             if kw_param: payload_params["keyword"] = kw_param
             if loc_param: payload_params["location"] = loc_param
@@ -110,7 +118,8 @@ def query_matched_profiles_via_stored_function(keyword=None, location=None):
                     return df
             return pd.DataFrame()
         except Exception as local_err:
-            st.error(f"⚠️ Local Microservice Connection Failure: Ensure api_server.py is running via Uvicorn!"); return pd.DataFrame()
+            st.error(f"⚠️ Gateway Server Connection Failure: Ensure your API microservice is running!"); return pd.DataFrame()
+
 
 def build_zip_archive(candidates):
     buf = io.BytesIO()
