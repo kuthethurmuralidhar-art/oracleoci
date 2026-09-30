@@ -4,3 +4,4 @@ oracledb
 openpyxl
 requests
 uvicorn
+fastapi

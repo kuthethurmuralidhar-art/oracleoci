@@ -96,7 +96,8 @@ def query_matched_profiles_via_stored_function(keyword=None, location=None):
             st.error(f"Cloud Direct DB Error: {cloud_err}"); return pd.DataFrame()
     else:
         try:
-            api_url = "http://localhost:8000/api/candidates"
+            #api_url = "http://localhost:8000/api/candidates"
+            api_url = "https://onrender.com"
             payload_params = {}
             if kw_param: payload_params["keyword"] = kw_param
             if loc_param: payload_params["location"] = loc_param
