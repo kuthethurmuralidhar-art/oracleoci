@@ -3,22 +3,28 @@ import streamlit as st, pandas as pd, os, io, zipfile, requests, oracledb
 W_DIR = os.path.join(os.getcwd(), "wallet_files")
 SECRETS_FILE_PATH = os.path.join(os.getcwd(), ".streamlit", "secrets.toml")
 
+import streamlit as st, pandas as pd, os, io, zipfile, requests, oracledb
+
+W_DIR = os.path.join(os.getcwd(), "wallet_files")
+SECRETS_FILE_PATH = os.path.join(os.getcwd(), ".streamlit", "secrets.toml")
+
 def get_db_connection():
     is_streamlit_active = False
     try:
         if st.runtime.exists(): is_streamlit_active = True
     except: pass
     
-    if is_streamlit_active:
-        # 🌐 Web Portal Mode: Inherits keys cleanly from Streamlit's runtime memory secrets
+    # ✅ THE CLOUD GATEWAY DETECTOR: Automatically pulls keys from Render if running in the cloud!
+    if os.environ.get("RENDER"):
+        db_pwd = os.environ.get("DB_PASSWORD")
+        wallet_pwd = os.environ.get("WALLET_PASSWORD")
+    elif is_streamlit_active:
         db_pwd = st.secrets["db_password"]
         wallet_pwd = st.secrets["wallet_password"]
     else:
-        # 💻 Bare Console Script Mode: Parses your physical secrets.toml file directly from your disk folder!
         db_pwd, wallet_pwd = None, None
         if os.path.exists(SECRETS_FILE_PATH):
             try:
-                # Custom lightweight parser block to read TOML key-value rows safely without extra libraries
                 with open(SECRETS_FILE_PATH, "r", encoding="utf-8") as f_sec:
                     for line in f_sec:
                         clean_line = line.strip()
@@ -31,7 +37,6 @@ def get_db_connection():
             except Exception as e:
                 print(f"⚠️ Warning: Could not read local secrets.toml file: {e}")
         
-        # Fallback security check guard
         if not db_pwd or not wallet_pwd:
             raise ValueError(f"❌ Error: Secure credentials missing! Ensure keys are active inside '{SECRETS_FILE_PATH}'")
 
@@ -45,6 +50,7 @@ def get_db_connection():
     conn = oracledb.connect(**p)
     conn.outputtypehandler = bh
     return conn
+
 
 def get_master_taxonomy():
     return {

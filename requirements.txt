@@ -3,3 +3,4 @@ pandas
 oracledb
 openpyxl
 requests
+uvicorn
