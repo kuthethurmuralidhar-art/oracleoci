@@ -14,9 +14,8 @@ def on_row_toggle(m_key, r_key):
     if not st.session_state[r_key]:
         st.session_state[m_key] = False
 
-# ✅ PAGINATION GRID WORKSPACE ENGINE (8 RECORDS PER PAGE)
+# ✅ HARD-CLAMPED PAGINATION GRID ENGINE (STRICTLY 8 RECORDS MAX PER PAGE)
 def render_candidate_matrix_workspace(active_keywords, selected_locations_filter, s_tier):
-    # Initialize page controller states inside session memory dynamically
     if "current_page" not in st.session_state:
         st.session_state.current_page = 1
 
@@ -76,19 +75,20 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
     matched_candidates = sorted(matched_candidates, key=lambda x: x["SCORE_PCT"], reverse=True)
 
     # ======================================================================
-    # 📐 THE PAGINATION SLICER ENGINE
+    # 📐 HARD-BOUNDED SLICER CORE
     # ======================================================================
     records_per_page = 8
     total_records = len(matched_candidates)
     total_pages = (total_records + records_per_page - 1) // records_per_page
     
-    # Boundary guard: Ensure active page index doesn't float out of range
     if st.session_state.current_page > total_pages:
         st.session_state.current_page = max(1, total_pages)
 
     start_idx = (st.session_state.current_page - 1) * records_per_page
     end_idx = start_idx + records_per_page
-    page_records = matched_candidates[start_idx:end_idx]
+    
+    # ✅ INSULATED LAYER SLICE: Strictly force python to grab only 8 records maximum
+    page_records = list(matched_candidates[start_idx:end_idx])
 
     st.markdown(f"### 🎯 AI Ranking Workspace Matrix ({total_records} Total Profiles Available)")
     st.markdown(f"**Showing records {start_idx + 1} to {min(end_idx, total_records)} on Page {st.session_state.current_page} of {total_pages}**")
@@ -104,7 +104,7 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
 
     c0, c1, c2, c3, c4, c5 = st.columns([0.8, 2.2, 1.2, 1.2, 2.0, 3.2])
     with c0: 
-        select_all = st.checkbox("All", value=all_checked_by_user, key=master_key, on_change=on_master_toggle, args=(master_key, all_keys))
+        st.checkbox("All", value=all_checked_by_user, key=master_key, on_change=on_master_toggle, args=(master_key, all_keys))
         
     with c1: st.write("**Candidate Name**")
     with c2: st.write("**Location**")
@@ -140,27 +140,27 @@ def render_candidate_matrix_workspace(active_keywords, selected_locations_filter
         st.markdown("<hr style='margin:2px 0; border-top:1px dashed #ccc;'>", unsafe_allow_html=True)
 
     # ======================================================================
-    # 🕹️ PAGINATION INTERACTIVE CONTROLLER BUTTONS
+    # 🕹️ INTERACTIVE PREV / NEXT NAVIGATION CONTROLLER BUTTONS
     # ======================================================================
     st.markdown("<br>", unsafe_allow_html=True)
-    p_col1, p_col2, p_col3 = st.columns([2, 6, 2])
+    p_col1, p_col2, p_col3 = st.columns([3, 2, 3])
     
     with p_col1:
         if st.session_state.current_page > 1:
-            if st.button("◀️ Previous Page", use_container_width=True):
+            if st.button("◀️ Previous Page", use_container_width=True, key="btn_prev_page"):
                 st.session_state.current_page -= 1
                 st.rerun()
                 
     with p_col2:
-        st.markdown(f"<div style='text-align:center; font-weight:bold; padding-top:6px;'>Page {st.session_state.current_page} of {total_pages}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align:center; font-weight:bold; padding-top:6px; background-color:#ECEFF1; border-radius:4px; border:1px solid #CFD8DC;'>Page {st.session_state.current_page} of {total_pages}</div>", unsafe_allow_html=True)
         
     with p_col3:
         if st.session_state.current_page < total_pages:
-            if st.button("Next Page ▶️", use_container_width=True):
+            if st.button("Next Page ▶️", use_container_width=True, key="btn_next_page"):
                 st.session_state.current_page += 1
                 st.rerun()
 
-    # Dynamic secure cloud download binary streaming action trigger panel
+    # Dynamic cloud download panel
     if final_selected_ids:
         st.markdown("<br>", unsafe_allow_html=True)
         param_ids_string = ",".join(final_selected_ids)
