@@ -1,66 +1,89 @@
-import pandas as pd, oracledb, os
+import openpyxl, os, oracledb
+from utils import get_db_connection
 
-WALLET_DIR = r"D:\Personal\AIrelatedDocs\Oracle AI\Project\wallet_files"
-PROJECT_DIR = r"D:\Personal\AIrelatedDocs\Oracle AI\Project"
-SUBFOLDER = os.path.join(PROJECT_DIR, "profiles")
-EXCEL_TEMPLATE = os.path.join(PROJECT_DIR, "bulk_candidate_intake.xlsx")
+T_DIR = r"D:\Personal\AIrelatedDocs\Oracle AI\Project"
+excel_path = os.path.join(T_DIR, "bulk_candidate_intake.xlsx")
+profiles_dir = os.path.join(T_DIR, "profiles")
 
-connection_params = {
-    "user": "ADMIN", "password": "ProOracle_4U", "dsn": "search_low",
-    "config_dir": WALLET_DIR, "wallet_location": WALLET_DIR, "wallet_password": "Oracle_4U",
-    "ssl_server_dn_match": False
-}
+print("⏳ Initialising Incremental Append-Only Database Synchronisation Engine...")
+
+if not os.path.exists(excel_path):
+    print(f"❌ Error: Intake spreadsheet missing at {excel_path}! Run append_new_candidates.py first.")
+    exit()
 
 try:
-    if not os.path.exists(EXCEL_TEMPLATE): raise FileNotFoundError(f"Missing intake excel: {EXCEL_TEMPLATE}")
-    df_catalog = pd.read_excel(EXCEL_TEMPLATE)
-    
-    print("⏳ Connecting to Oracle Cloud Infrastructure (OCI) Database...")
-    conn = oracledb.connect(**connection_params)
+    # 1. Establish secure network link into OCI Cloud Database instance pool
+    conn = get_db_connection()
     cursor = conn.cursor()
     
-    # ✅ THE BULLETPROOF FIX: Wipes the old dirty table cells completely first!
-    print("🧹 Wiping stale OCI records via TRUNCATE TABLE handshake commands...")
-    cursor.execute("TRUNCATE TABLE skills")
-    conn.commit()
-    print("✨ Database table cleared successfully! Executing a fresh re-ingestion pass...")
+    # 2. Scan all registered candidate emails already sitting in the cloud
+    print("🔍 Fetching existing cloud table record matrix indexes...")
+    cursor.execute("SELECT email FROM skills")
+    existing_cloud_emails = {str(row[0]).strip().lower() for row in cursor.fetchall() if row and row[0]}
+    print(f"   -> Found {len(existing_cloud_emails)} active candidate records currently stored in cloud database.")
 
-    success_records = 0
-    print("\n🚀 Executing Automated Spreadsheet-Driven Ingestion Engine...")
-    print("-" * 105)
+    # 3. Load and parse your local intake spreadsheet catalog rows
+    wb = openpyxl.load_workbook(excel_path, data_only=True)
+    ws = wb.active
     
-    for idx, row in df_catalog.iterrows():
-        c_name = str(row['Name']).strip()
-        c_email = str(row['Email']).strip()
-        c_exp = float(row['Experience_Years'])
-        c_loc = str(row['Location']).strip() if 'Location' in row else "General"
-        c_pdf_name = str(row['PDF_File_Name']).strip()
+    new_records_to_upload = []
+    for r in range(2, ws.max_row + 1):
+        c_name = ws.cell(row=r, column=1).value
+        c_email = str(ws.cell(row=r, column=2).value or "").strip()
+        c_loc = ws.cell(row=r, column=3).value
+        c_exp = ws.cell(row=r, column=4).value
+        c_skills = ws.cell(row=r, column=5).value
+        c_filename = ws.cell(row=r, column=6).value
         
-        # ✅ THE CORE CURE: Natively captures your precise written worksheet skills instead of guessing!
-        c_excel_skills = str(row['Skills_Matrix']).strip()
-        if not c_excel_skills or c_excel_skills.lower() == "nan": c_excel_skills = "General"
-        
-        full_pdf_path = os.path.join(SUBFOLDER, c_pdf_name)
-        binary_pdf_bytes = None
+        if not c_email:
+            continue
+            
+        # THE DELTA FILTER: If email is already present inside OCI cloud database, completely skip it!
+        if c_email.lower() in existing_cloud_emails:
+            continue
+            
+        new_records_to_upload.append({
+            "name": c_name, "email": c_email, "location": c_loc,
+            "exp": c_exp, "skills": c_skills, "file": c_filename
+        })
+
+    if not new_records_to_upload:
+        print("--> 💡 No new unmatched records found. Cloud table data is already perfectly synchronized!")
+        cursor.close()
+        conn.close()
+        exit()
+
+    print(f"🚀 Discovered {len(new_records_to_upload)} new candidate profiles to ingest. Initializing secure streaming...")
+    
+    # 4. ✅ PERFECTLY ALIGNED: Removed phone column completely. Maps strictly to your 6 real table attributes!
+    insert_sql = """
+        INSERT INTO skills (name, email, location, experience_years, skills_matrix, resume_blob)
+        VALUES (:1, :2, :3, :4, :5, :6)
+    """
+
+    for cand in new_records_to_upload:
+        full_pdf_path = os.path.join(profiles_dir, cand["file"])
+        blob_bytes = None
         
         if os.path.exists(full_pdf_path):
-            with open(full_pdf_path, "rb") as pdf_file: binary_pdf_bytes = pdf_file.read()
-            pdf_status = "Binary PDF BLOB Attached"
+            with open(full_pdf_path, "rb") as f_bin:
+                blob_bytes = f_bin.read()
         else:
-            pdf_status = "⚠️ Local PDF asset file not found (Null BLOB uploaded)"
-            
-        sql_insert = """
-            INSERT INTO skills (name, email, experience_years, location, skills_matrix, resume_blob)
-            VALUES (:1, :2, :3, :4, :5, :6)
-        """
-        cursor.execute(sql_insert, [c_name, c_email, c_exp, c_loc, c_excel_skills, binary_pdf_bytes])
-        print(f" Row {idx+1}: ✅ Onboarded NEW Profile '{c_name}' ➔ Location: {c_loc} | Skills: {c_excel_skills} | [{pdf_status}]")
-        success_records += 1
-        
+            print(f"  ⚠️ Warning: Physical PDF file '{cand['file']}' missing in profiles folder. Uploading profile text row only.")
+
+        # Execute single row insert safely mapping to the 6 explicit columns
+        cursor.execute(insert_sql, [
+            cand["name"], cand["email"], cand["location"], 
+            float(cand["exp"] or 0.0), cand["skills"], blob_bytes
+        ])
+        print(f"  ✅ Successfully uploaded fresh profile: {cand['name']} ({cand['email']}) to OCI.")
+
+    # 5. Lock down transaction and save permanent cell state modifications
     conn.commit()
-    print("-" * 105)
-    print(f"🏆 INGESTION SUMMARY: Successfully loaded {success_records} fresh profiles with complete location parameters mapped.")
+    print("\n📊 SUCCESS: Incremental OCI Cloud migration pass complete. New rows safely integrated!")
+    
     cursor.close()
     conn.close()
+
 except Exception as err:
-    print(f"\n❌ Critical Pipeline Crash Exception: {err}")
+    print(f"❌ Database Transaction Interruption Error: {str(err)}")
